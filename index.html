@@ -54,6 +54,10 @@ const CONFIG = {
   rocketRadius: 13,
   padWidth: 84,
   planetPadWidth: 90,
+  coinCollectRadius: 31,
+  coinMinPadDist: 50,
+  coinObstacleBonusDist: 70,
+  coinSpawnRetries: 5,
 };
 
 const DIFF_KEYS = ['easy', 'medium', 'hard'];
@@ -252,6 +256,16 @@ const SPRITES = {
     '.OYYYYO..',
     '..OOOO...',
   ], { Y: '#6abf4b', O: '#4e9636', G: '#2e7d32' }),
+  coin: makeSprite([
+    '..SSSS..',
+    '.SYYYYS.',
+    'SYHHHYS.',
+    'SYHHHYS.',
+    'SYYYYYS.',
+    'SYYYYYS.',
+    'SYHHHYS.',
+    '.SYYYS..',
+  ], { S: '#c9a020', Y: '#ffd166', H: '#ffffff' }),
   astronaut: makeSprite([
     '..WWWW..',
     '.WWWWWW.',
@@ -607,6 +621,8 @@ let worldTop = 0;
 let winTime = 0;
 let confetti = [];
 let lemonRain = [];
+let coins = [];
+let wallet = null;
 let slingPad = null;
 let slingAngle = 0;
 let slingPower = 0.7;
@@ -646,6 +662,179 @@ for (let i = 0; i < 220; i++) {
 
 function addToast(text) {
   toasts.push({ text, t: 2 });
+}
+
+// ---------------------------------------------------------------- economy
+
+const SAVE_KEY = 'rocket_lemon_save_v1';
+
+const COIN_SPAWN_BY_DIFF = {
+  easy: [0, 1],
+  medium: [0, 2],
+  hard: [1, 2],
+};
+
+function defaultWallet() {
+  return { version: 1, coins: 0, totalEarned: 0 };
+}
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) {
+      wallet = defaultWallet();
+      return;
+    }
+    const data = JSON.parse(raw);
+    if (data.version !== 1 || typeof data.coins !== 'number' || typeof data.totalEarned !== 'number') {
+      wallet = defaultWallet();
+      return;
+    }
+    wallet = data;
+  } catch {
+    wallet = defaultWallet();
+  }
+}
+
+function saveWallet() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(wallet));
+  } catch { /* quota or private browsing */ }
+}
+
+function distToPlatform(x, y, p) {
+  const cx = p.x + p.w / 2;
+  const dx = Math.max(Math.abs(x - cx) - p.w / 2, 0);
+  const dy = Math.abs(y - p.y);
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function isValidCoinPos(x, y) {
+  for (const p of platforms) {
+    if (distToPlatform(x, y, p) < CONFIG.coinMinPadDist) return false;
+  }
+  return true;
+}
+
+function obstaclesInSegment(s, boundaries) {
+  return obstacles.filter(o => o.y >= boundaries[s] && o.y <= boundaries[s + 1]);
+}
+
+function coinValueAt(x, y, segObs) {
+  const bonusDist = CONFIG.coinObstacleBonusDist;
+  for (const o of segObs) {
+    const dx = x - o.x;
+    const dy = y - o.y;
+    if (dx * dx + dy * dy < bonusDist * bonusDist) return 3;
+  }
+  return 1;
+}
+
+function trySpawnCoin(x, y, segObs) {
+  if (!isValidCoinPos(x, y)) return null;
+  return {
+    x,
+    y,
+    value: coinValueAt(x, y, segObs),
+    collected: false,
+    bobPhase: Math.random() * Math.PI * 2,
+  };
+}
+
+function generateCoins(diffKey, boundaries) {
+  coins = [];
+  const [minPerSeg, maxPerSeg] = COIN_SPAWN_BY_DIFF[diffKey];
+  for (let s = 0; s < boundaries.length - 1; s++) {
+    const count = minPerSeg + Math.floor(Math.random() * (maxPerSeg - minPerSeg + 1));
+    const yMin = boundaries[s] + 100;
+    const yMax = boundaries[s + 1] - 100;
+    if (yMax <= yMin) continue;
+    const segObs = obstaclesInSegment(s, boundaries);
+    for (let c = 0; c < count; c++) {
+      let placed = null;
+      for (let t = 0; t < CONFIG.coinSpawnRetries; t++) {
+        const x = 30 + Math.random() * (W - 60);
+        const y = yMin + Math.random() * (yMax - yMin);
+        placed = trySpawnCoin(x, y, segObs);
+        if (placed) break;
+      }
+      if (placed) coins.push(placed);
+    }
+  }
+  const planetY = platforms[platforms.length - 1].y;
+  const ballisticCount = 1 + Math.floor(Math.random() * 2);
+  const bYMin = planetY + 80;
+  const bYMax = moon.y - 80;
+  if (bYMax > bYMin) {
+    for (let c = 0; c < ballisticCount; c++) {
+      let placed = null;
+      for (let t = 0; t < CONFIG.coinSpawnRetries; t++) {
+        const x = 30 + Math.random() * (W - 60);
+        const y = bYMin + Math.random() * (bYMax - bYMin);
+        placed = trySpawnCoin(x, y, []);
+        if (placed) {
+          placed.value = 3;
+          break;
+        }
+      }
+      if (placed) coins.push(placed);
+    }
+  }
+}
+
+function collectCoin(coin) {
+  if (coin.collected) return;
+  coin.collected = true;
+  wallet.coins += coin.value;
+  wallet.totalEarned += coin.value;
+  saveWallet();
+  addToast('+' + coin.value + (coin.value === 1 ? ' MOEDA' : ' MOEDAS'));
+  audio.sfxPickup();
+  for (let i = 0; i < 14; i++) {
+    particles.push({
+      x: coin.x,
+      y: coin.y,
+      vx: (Math.random() * 2 - 1) * 120,
+      vy: (Math.random() * 2 - 1) * 120,
+      life: 0.4 + Math.random() * 0.3,
+      color: Math.random() < 0.5 ? '#ffd166' : '#ffffff',
+    });
+  }
+}
+
+function updateCoinCollisions() {
+  const reachSq = CONFIG.coinCollectRadius * CONFIG.coinCollectRadius;
+  for (const coin of coins) {
+    if (coin.collected) continue;
+    const dx = rocket.x - coin.x;
+    const dy = rocket.y - coin.y;
+    if (dx * dx + dy * dy < reachSq) collectCoin(coin);
+  }
+}
+
+function drawCoins() {
+  for (const coin of coins) {
+    if (coin.collected) continue;
+    const y = sy(coin.y) + Math.sin(time * 3 + coin.bobPhase) * 3;
+    if (y < -30 || y > H + 30) continue;
+    ctx.shadowColor = '#ffd166';
+    ctx.shadowBlur = 12;
+    ctx.drawImage(SPRITES.coin, coin.x - 6, y - 6, 12, 12);
+    ctx.shadowBlur = 0;
+  }
+}
+
+function drawCoinBalanceInline(fuelBarX, fuelBarY, fuelBarW, fuelBarH) {
+  const coinAreaX = fuelBarX + fuelBarW + 14;
+  const centerY = fuelBarY + fuelBarH / 2;
+  ctx.shadowColor = '#ffd166';
+  ctx.shadowBlur = 6;
+  ctx.drawImage(SPRITES.coin, coinAreaX, centerY - 7, 14, 14);
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 11px monospace';
+  ctx.fillStyle = '#ffd166';
+  ctx.fillText(String(wallet.coins), coinAreaX + 18, centerY + 4);
 }
 
 function generateWorld(diffKey) {
@@ -691,10 +880,10 @@ function generateWorld(diffKey) {
       });
     }
   }
-
   hazards = [];
   cometTimer = 1 + Math.random() * (diff.cometMax - diff.cometMin) + diff.cometMin;
   flareTimer = 1 + Math.random() * (diff.flareMax - diff.flareMin) + diff.flareMin;
+  generateCoins(diffKey, boundaries);
 }
 
 function getActiveStats() {
@@ -1075,6 +1264,8 @@ function updatePlaying(dt) {
     const reach = CONFIG.rocketRadius + 20;
     if (dx * dx + dy * dy < reach * reach) collectLemon(targetPlatform);
   }
+
+  updateCoinCollisions();
 
   for (let i = 0; i < platforms.length; i++) {
     if (i > targetIndex) continue; // locked platforms are intangible
@@ -1707,6 +1898,8 @@ function drawHUD() {
     ctx.shadowBlur = 0;
   }
 
+  drawCoinBalanceInline(20, 32, 150, 8);
+
   // target distance + velocity
   const target = platforms[targetIndex];
   const slingScene = state === 'slingshot' || ballistic;
@@ -1897,6 +2090,10 @@ function renderTitle() {
     [isMobile ? 'INCLINE O CELULAR - SEGURE PARA EMPUXO' : '←/→ GIRAR - ↑ EMPUXO - M SOM', 640, 11, '#8892a6'],
     ['PEGUE CADA LIMÃO. POUSE SUAVEMENTE NA LUA.', 662, 11, '#8892a6'],
   ]);
+  ctx.font = 'bold 11px monospace';
+  ctx.fillStyle = '#8fa3c8';
+  ctx.textAlign = 'left';
+  ctx.fillText('MOEDAS: ' + wallet.coins, 20, H - 24);
   drawVignette();
 }
 
@@ -2068,6 +2265,7 @@ function renderWorld() {
   drawGround();
   platforms.forEach((p, i) => { if (p.isPlanet) drawPlanet(p, i); else drawPlatform(p, i); });
   drawLemons();
+  drawCoins();
   drawObstacles();
   drawHazards();
   if (state === 'slingshot') drawSlingshotRig();
@@ -2092,7 +2290,7 @@ function renderWorld() {
 
   if (state === 'win' && winTime > 3.2) {
     ctx.fillStyle = 'rgba(10,14,30,0.82)';
-    roundRect(60, 96, W - 120, 196, 12);
+    roundRect(60, 96, W - 120, 216, 12);
     ctx.fill();
     ctx.strokeStyle = 'rgba(255,209,102,0.35)';
     ctx.lineWidth = 1;
@@ -2101,7 +2299,8 @@ function renderWorld() {
       ['VOCÊ CHEGOU', 148, 30, '#ffd166', true],
       ['NA LUA!', 186, 30, '#ffd166', true],
       ['TENTATIVAS: ' + attempts, 228, 14, '#cfe3ff'],
-      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'R REPETIR - ENTER MENU', 264, 13, '#ffffff'],
+      ['MOEDAS: ' + wallet.coins, 252, 14, '#ffd166'],
+      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'R REPETIR - ENTER MENU', 284, 13, '#ffffff'],
     ]);
   } else if (state === 'lose') {
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -2124,7 +2323,8 @@ function renderWorld() {
     drawCenteredText([
       [crashReason, reasonY, 11, '#8fa3c8'],
       ['TENTATIVA ' + attempts, reasonY + 26, 13, '#8fa3c8'],
-      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'R REPETIR - ENTER MENU', reasonY + 58, 13, '#ffffff'],
+      ['MOEDAS: ' + wallet.coins, reasonY + 46, 13, '#ffd166'],
+      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'R REPETIR - ENTER MENU', reasonY + 74, 13, '#ffffff'],
     ]);
   }
 }
@@ -2343,6 +2543,7 @@ function frame(t) {
   render();
   requestAnimationFrame(frame);
 }
+loadSave();
 requestAnimationFrame(frame);
 loadAvatars();
 
@@ -2372,6 +2573,17 @@ window.__rl = {
   set slingPower(v) { slingPower = v; },
   get ballistic() { return ballistic; },
   get moon() { return moon; },
+  get wallet() { return wallet; },
+  get coins() { return coins; },
+  resetWallet() {
+    wallet = defaultWallet();
+    saveWallet();
+  },
+  addCoins(n) {
+    wallet.coins += n;
+    wallet.totalEarned += n;
+    saveWallet();
+  },
   launchSlingshot,
 };
 </script>
