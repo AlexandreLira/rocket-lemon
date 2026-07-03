@@ -66,41 +66,37 @@ const DIFFICULTIES = {
 const CHAR_KEYS = ['alexandre', 'tabata', 'kaique', 'weslley'];
 const CHARACTERS = {
   alexandre: {
-    label: 'ALEX "GIT PUSH --FORCE" LIRA',
+    label: 'ALEX LIRA',
     shortName: 'ALEX LIRA',
     role: 'DEV',
     desc: 'QUEBROU PROD TRÊS VEZES HOJE. MESMO ASSIM CONFIA NO EMPUXO.',
-    bonus: 'ROTAÇÃO +20%',
     startToast: 'FAZENDO DEPLOY EM PROD...',
     avatar: 'assets/avatars/alexandre.png',
     stats: { rotationMult: 1.2 },
   },
   tabata: {
-    label: 'TABATA "ISSO É FEATURE" RUIZ',
+    label: 'TABATA RUIZ',
     shortName: 'TABATA RUIZ',
     role: 'DEV',
     desc: 'TRANSFORMA CRASH EM SPRINT. SE CAIU, VIROU RETRO.',
-    bonus: 'AUTO-ESTABILIZAÇÃO +35%',
     startToast: 'SE CRASHOU, É RETRO',
     avatar: 'assets/avatars/tabata.png',
     stats: { stabilizeMult: 1.35 },
   },
   kaique: {
-    label: 'KAIQUE "SÓ MAIS UM LIMÃO" COSTA',
+    label: 'KAIQUE COSTA',
     shortName: 'KAIQUE COSTA',
     role: 'DADOS',
-    desc: 'O ROADMAP NÃO PARA NO MVP. QUER TODOS OS LIMÕES.',
-    bonus: 'COMB. 120 / LIMÃO +70',
+    desc: 'SÓ MAIS UM PASTEL',
     startToast: 'COLETANDO TODOS OS LIMÕES',
     avatar: 'assets/avatars/kaique.png',
     stats: { fuelMax: 120, refuelAmount: 70 },
   },
   weslley: {
-    label: 'WESLLEY "FORA DO INTERVALO" ARAUJO',
+    label: 'WESLLEY ARAUJO',
     shortName: 'WESLLEY ARAUJO',
     role: 'PRODUTO',
     desc: 'PREVIU 99% DE CHANCE DE EXPLOSÃO. VOCÊ ESTÁ NO 1%.',
-    bonus: 'HUD ESTENDIDO',
     startToast: 'PROBABILIDADE: 1% DE SUCESSO',
     avatar: 'assets/avatars/weslley.png',
     stats: { extendedHud: true },
@@ -2019,15 +2015,12 @@ function drawCharacterCard(key, rect, selected) {
   ctx.font = '13px monospace';
   const badgeW = 28;
   const roleW = ctx.measureText(ch.role).width;
-  const bonusW = ctx.measureText(' · ' + ch.bonus).width;
-  const roleTotalW = badgeW + roleW + bonusW;
+  const roleTotalW = badgeW + roleW;
   const roleStartX = textCenterX - roleTotalW / 2;
   drawRoleBadge(ch.role, roleStartX, roleY, selected);
   ctx.textAlign = 'left';
   ctx.fillStyle = selected ? '#ffd166' : '#5a6478';
   ctx.fillText(ch.role, roleStartX + badgeW, roleY);
-  ctx.fillStyle = selected ? '#cfe3ff' : '#5a6478';
-  ctx.fillText(' · ' + ch.bonus, roleStartX + badgeW + roleW, roleY);
   drawCenteredWrappedTextAt(ch.desc, textCenterX, roleY + roleLineH, textAreaW, '12px monospace', descColor, descLineH, 2);
 }
 
