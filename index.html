@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Rocket Lemon</title>
 <style>
   html, body {
@@ -490,6 +491,10 @@ const MOON_RADIUS = 300;
 
 const rocket = { x: W / 2, y: CONFIG.rocketHalfHeight, vx: 0, vy: 0, angle: 0, fuel: CONFIG.fuelMax, landed: true };
 const keys = { left: false, right: false, up: false, down: false };
+const isMobile = matchMedia('(pointer: coarse)').matches;
+let tiltEnabled = false;
+let neutralGamma = null;
+const TILT_DEAD_ZONE = 4;
 
 const NEBULAE = [
   { x: 90, y: 300, r: 190, color: '123,92,255' },
@@ -593,9 +598,15 @@ function startGame(diffKey, isRetry) {
   dragging = false;
   crashReason = '';
   deathQuote = '';
+  keys.left = false;
+  keys.right = false;
+  keys.up = false;
+  keys.down = false;
+  neutralGamma = null;
+  if (isMobile) enableTilt();
   state = 'playing';
   addToast(CHARACTERS[currentCharacter].startToast);
-  addToast('PRESSIONE ↑ PARA DECOLAR');
+  addToast(isMobile ? 'SEGURE A TELA PARA DECOLAR' : 'PRESSIONE ↑ PARA DECOLAR');
 }
 
 // ---------------------------------------------------------------- update
@@ -1333,9 +1344,9 @@ function drawSlingshotUI() {
   }
   ctx.globalAlpha = 1;
   drawCenteredText([
-    ['ARRASTE O FOGUETE PRA TRÁS E SOLTE', 622, 12, '#cfe3ff'],
+    [isMobile ? 'TOQUE E ARRASTE O FOGUETE PRA TRÁS E SOLTE' : 'ARRASTE O FOGUETE PRA TRÁS E SOLTE', 622, 12, '#cfe3ff'],
     ['ACERTE A LUA!', 644, 14, '#ffd166', true],
-    ['(OU MIRE COM SETAS + ESPAÇO)', 668, 10, '#8892a6'],
+    [isMobile ? '(TOQUE E ARRASTE)' : '(OU MIRE COM SETAS + ESPAÇO)', 668, 10, '#8892a6'],
   ]);
 }
 
@@ -1561,10 +1572,10 @@ function renderTitle() {
   ctx.drawImage(flame, -15, 46, 30, 24);
   ctx.restore();
   if (Math.floor(time * 2) % 2 === 0) {
-    drawCenteredText([['PRESSIONE ENTER PARA COMEÇAR', 560, 16, '#ffffff', true]]);
+    drawCenteredText([[isMobile ? 'TOQUE PARA COMEÇAR' : 'PRESSIONE ENTER PARA COMEÇAR', 560, 16, '#ffffff', true]]);
   }
   drawCenteredText([
-    ['←/→ GIRAR - ↑ EMPUXO - M SOM', 640, 11, '#8892a6'],
+    [isMobile ? 'INCLINE O CELULAR - SEGURE PARA EMPUXO' : '←/→ GIRAR - ↑ EMPUXO - M SOM', 640, 11, '#8892a6'],
     ['PEGUE CADA LIMÃO. POUSE SUAVEMENTE NA LUA.', 662, 11, '#8892a6'],
   ]);
   drawVignette();
@@ -1607,7 +1618,7 @@ function renderCharacterMenu() {
     ctx.fillText(truncateText(ch.role + ' - ' + ch.bonus, textW, '10px monospace'), textX, roleY);
     drawWrappedText(ch.desc, textX, roleY + 13, textW, '10px monospace', descColor, 12, 2);
   });
-  drawCenteredText([['↑/↓ SELECIONAR - 1-4 ATALHO - ENTER CONTINUAR - ESC VOLTAR', 680, 10, '#8892a6']]);
+  drawCenteredText([[isMobile ? 'TOQUE PARA SELECIONAR' : '↑/↓ SELECIONAR - 1-4 ATALHO - ENTER CONTINUAR - ESC VOLTAR', 680, 10, '#8892a6']]);
   drawVignette();
 }
 
@@ -1631,7 +1642,7 @@ function renderMenu() {
       [diff.desc, y + 24, 11, selected ? '#cfe3ff' : '#5a6478'],
     ]);
   });
-  drawCenteredText([['↑/↓ SELECIONAR - ENTER DECOLAR - ESC VOLTAR', 620, 11, '#8892a6']]);
+  drawCenteredText([[isMobile ? 'TOQUE PARA DECOLAR' : '↑/↓ SELECIONAR - ENTER DECOLAR - ESC VOLTAR', 620, 11, '#8892a6']]);
   drawVignette();
 }
 
@@ -1674,7 +1685,7 @@ function renderWorld() {
       ['VOCÊ CHEGOU', 148, 30, '#ffd166', true],
       ['NA LUA!', 186, 30, '#ffd166', true],
       ['TENTATIVAS: ' + attempts, 228, 14, '#cfe3ff'],
-      ['R REPETIR - ENTER MENU', 264, 13, '#ffffff'],
+      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'R REPETIR - ENTER MENU', 264, 13, '#ffffff'],
     ]);
   } else if (state === 'lose') {
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -1697,7 +1708,7 @@ function renderWorld() {
     drawCenteredText([
       [crashReason, reasonY, 11, '#8fa3c8'],
       ['TENTATIVA ' + attempts, reasonY + 26, 13, '#8fa3c8'],
-      ['R REPETIR - ENTER MENU', reasonY + 58, 13, '#ffffff'],
+      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'R REPETIR - ENTER MENU', reasonY + 58, 13, '#ffffff'],
     ]);
   }
 }
@@ -1710,6 +1721,32 @@ function render() {
 }
 
 // ---------------------------------------------------------------- input
+
+async function enableTilt() {
+  neutralGamma = null;
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const result = await DeviceOrientationEvent.requestPermission();
+      tiltEnabled = result === 'granted';
+    } catch {
+      tiltEnabled = false;
+    }
+  } else {
+    tiltEnabled = true;
+  }
+}
+
+window.addEventListener('deviceorientation', (e) => {
+  if (!isMobile || !tiltEnabled || state !== 'playing' || ballistic) return;
+  if (e.gamma == null) return;
+  if (neutralGamma === null) neutralGamma = e.gamma;
+  const delta = e.gamma - neutralGamma;
+  keys.left = false;
+  keys.right = false;
+  if (delta < -TILT_DEAD_ZONE) keys.left = true;
+  else if (delta > TILT_DEAD_ZONE) keys.right = true;
+});
 
 window.addEventListener('keydown', (e) => {
   if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault();
@@ -1751,38 +1788,125 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowDown') keys.down = true;
 });
 
-function canvasPos(e) {
+function canvasPosFromClient(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   return {
-    x: (e.clientX - rect.left) * (W / rect.width),
-    y: (e.clientY - rect.top) * (H / rect.height),
+    x: (clientX - rect.left) * (W / rect.width),
+    y: (clientY - rect.top) * (H / rect.height),
   };
 }
 
-canvas.addEventListener('mousedown', (e) => {
-  if (state !== 'slingshot') return;
-  const m = canvasPos(e);
-  const dx = m.x - rocket.x;
-  const dy = m.y - sy(rocket.y);
-  if (dx * dx + dy * dy < 60 * 60) dragging = true;
-});
+function canvasPos(e) {
+  return canvasPosFromClient(e.clientX, e.clientY);
+}
 
-canvas.addEventListener('mousemove', (e) => {
-  if (!dragging || state !== 'slingshot') return;
-  const m = canvasPos(e);
+function handleMenuTap(x, y) {
+  if (state === 'title') {
+    state = 'character';
+    menuIndex = 0;
+  } else if (state === 'character') {
+    const cardX = 70;
+    const cardW = W - 140;
+    const cardH = 84;
+    const cardGap = 96;
+    const cardTop = 188;
+    for (let i = 0; i < CHAR_KEYS.length; i++) {
+      const top = cardTop + i * cardGap;
+      if (x >= cardX && x <= cardX + cardW && y >= top && y <= top + cardH) {
+        currentCharacter = CHAR_KEYS[i];
+        state = 'difficulty';
+        menuIndex = 0;
+        return;
+      }
+    }
+  } else if (state === 'difficulty') {
+    for (let i = 0; i < DIFF_KEYS.length; i++) {
+      const cy = 260 + i * 90;
+      if (x >= 90 && x <= W - 90 && y >= cy - 26 && y <= cy + 40) {
+        startGame(DIFF_KEYS[i], false);
+        return;
+      }
+    }
+  } else if (state === 'win' || state === 'lose') {
+    if (y > H / 2) {
+      state = 'title';
+    } else {
+      startGame(currentDiff, true);
+    }
+  }
+}
+
+function updateSlingshotDrag(clientX, clientY) {
+  const m = canvasPosFromClient(clientX, clientY);
   const anchorX = slingPad.x + slingPad.w / 2;
   const anchorY = sy(slingPad.y + 34);
   const dx = m.x - anchorX;
   const dy = m.y - anchorY;
-  if (dy <= 4) return; // must pull downward, like drawing a sling
+  if (dy <= 4) return;
   slingAngle = Math.max(-1.2, Math.min(1.2, Math.atan2(-dx, dy)));
   const pullDistance = Math.sqrt(dx * dx + dy * dy);
   slingPower = Math.max(0.25, Math.min(1, pullDistance / 90));
+}
+
+let touchStart = null;
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  audio.init();
+  const t = e.changedTouches[0];
+  touchStart = { x: t.clientX, y: t.clientY };
+  if (state === 'playing') keys.up = true;
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  if (state === 'playing') {
+    if (e.touches.length === 0) keys.up = false;
+    touchStart = null;
+    return;
+  }
+  if (state === 'slingshot' || dragging) {
+    touchStart = null;
+    return;
+  }
+  if (!touchStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStart.x;
+  const dy = t.clientY - touchStart.y;
+  if (dx * dx + dy * dy > 400) {
+    touchStart = null;
+    return;
+  }
+  const m = canvasPos(t);
+  handleMenuTap(m.x, m.y);
+  touchStart = null;
+}, { passive: false });
+
+canvas.addEventListener('touchcancel', (e) => {
+  if (state === 'playing' && e.touches.length === 0) keys.up = false;
+  touchStart = null;
+}, { passive: false });
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (state !== 'slingshot') return;
+  const m = canvasPos(e);
+  const dx = m.x - rocket.x;
+  const dy = m.y - sy(rocket.y);
+  if (dx * dx + dy * dy < 60 * 60) {
+    dragging = true;
+    canvas.setPointerCapture(e.pointerId);
+  }
 });
 
-canvas.addEventListener('mouseup', () => {
+canvas.addEventListener('pointermove', (e) => {
+  if (!dragging || state !== 'slingshot') return;
+  updateSlingshotDrag(e.clientX, e.clientY);
+});
+
+canvas.addEventListener('pointerup', (e) => {
   if (!dragging) return;
   dragging = false;
+  if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
   if (state === 'slingshot') launchSlingshot();
 });
 
@@ -1809,6 +1933,10 @@ loadAvatars();
 // debug/test hooks
 window.__rl = {
   CONFIG, DIFFICULTIES, startGame, update, render, keys, audio,
+  isMobile, enableTilt,
+  get tiltEnabled() { return tiltEnabled; },
+  get neutralGamma() { return neutralGamma; },
+  set neutralGamma(v) { neutralGamma = v; },
   get state() { return state; },
   set state(v) { state = v; },
   get rocket() { return rocket; },
