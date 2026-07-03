@@ -18,17 +18,18 @@
   canvas {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+    max-width: 100vw;
     max-height: 100vh;
     box-shadow: 0 0 60px rgba(80, 110, 255, 0.15);
   }
 </style>
 </head>
 <body>
-<canvas id="game" width="480" height="720"></canvas>
+<canvas id="game" width="1180" height="720"></canvas>
 <script>
 'use strict';
 
-const W = 480;
+const W = 1180;
 const H = 720;
 
 const CONFIG = {
@@ -113,6 +114,8 @@ const OBSTACLE_TYPES = {
   ray:       { radius: 10, bob: 0,  reason: 'ATINGIDO POR RAIO TÓXICO' },
   dentist:   { radius: 12, bob: 30, reason: 'O DENTISTA TE PEGOU' },
   dog:       { radius: 12, bob: 35, reason: 'UM CACHORRO ESPACIAL TE PEGOU' },
+  lemonoid:  { radius: 11, bob: 15, reason: 'COLIDIU COM LIMÃO VOADOR' },
+  tooth:     { radius: 11, bob: 10, reason: 'COLIDIU COM DENTE VOADOR' },
 };
 const OBSTACLE_KEYS = Object.keys(OBSTACLE_TYPES);
 
@@ -173,14 +176,14 @@ const SPRITES = {
     '..GGGGGGG...',
     '.GGGDDGGGG..',
     'GGGGDDGGGGG.',
-    'GGGGGGGGGDG.',
-    'GGDGGGGGGDG.',
+    'GGGGGGGGGEG.',
+    'GGDGGGGGGEG.',
     'GGDDGGGGGGG.',
     'GGGGGGDDGGG.',
     '.GGGGGDDGG..',
     '..GGGGGGG...',
     '...GGGG.....',
-  ], { G: '#8d8d99', D: '#5c5c68' }),
+  ], { G: '#8a8478', D: '#5f5b52', E: '#6b6659' }),
   satellite: makeSprite([
     'PPP...AA...PPP',
     'PPPAABBBBAAPPP',
@@ -189,17 +192,17 @@ const SPRITES = {
     '.....BBBB.....',
     '......AA......',
     '.....AAAA.....',
-  ], { P: '#3a6ff7', B: '#c9d2e0', W: '#7fd4e8', A: '#7d8698' }),
+  ], { P: '#3d6fb4', B: '#c9cdd6', W: '#7fd4e8', A: '#7d8698' }),
   junk: makeSprite([
     '.CCCCCC.',
     'CCCCCCCC',
-    'CRRRRRRC',
+    'CDDDDDDC',
     'CCCCCCCC',
     'CCCCCCCC',
-    'CRRRRRRC',
+    'CDDDDDDC',
     'CCCCCCCC',
     '.CCCCCC.',
-  ], { C: '#b0b8c0', R: '#d04030' }),
+  ], { C: '#9a9a9a', D: '#6d6d6d' }),
   ray: makeSprite([
     '.....YY.',
     '....YY..',
@@ -213,22 +216,37 @@ const SPRITES = {
     '.YY.....',
     'YY......',
     'Y.......',
-  ], { Y: '#ffe94a' }),
+  ], { Y: '#ffe650' }),
   dentist: makeSprite([
-    '...HHHH.....',
-    '..HSSSSH....',
-    '..SSSSSS....',
-    '..SMMMMS....',
-    '...MMMM.....',
-    '..WWWWWW....',
-    '.WWWWWWW.AA.',
-    '.WWWWWWWAAAA',
-    '.WWWWWWW..AD',
-    '..WWWWWW....',
-    '..WW..WW....',
-    '..WW..WW....',
-    '..BB..BB....',
-  ], { H: '#4a3220', S: '#f0c8a0', M: '#7fd4e8', W: '#f4f4f8', A: '#9aa3b2', D: '#e8e8f0', B: '#2f2f38' }),
+    '..SSSS....',
+    '.SSSSSS...',
+    '.SSSSSS...',
+    '.WWWWWW...',
+    'WWWWWWWW..',
+    'WWWWWWWWAA',
+    'WWWWWWWWAR',
+    '.WWWWWW...',
+  ], { S: '#f0c8a0', W: '#e8e8e8', A: '#7a7a7a', R: '#ff5b5b' }),
+  lemonoid: makeSprite([
+    '....GG....',
+    '..YYYYYY..',
+    '.YYYYYYYY.',
+    'YYYYYYYYYY',
+    'YYYHYYYYYY',
+    'YYYYYYYYYY',
+    '.YYYYYYYY.',
+    '..YYYYYY..',
+  ], { Y: '#e8e34a', G: '#5fae4a', H: '#fff8d8' }),
+  tooth: makeSprite([
+    '..WWWWWW..',
+    '.WWWWWWWW.',
+    'WWWWWWWWWW',
+    'WWWWWWWWWW',
+    '.WWWWWWWW.',
+    '..R.RR.R..',
+    '..R.RR.R..',
+    '..R.RR.R..',
+  ], { W: '#f5f2e8', R: '#efe9da' }),
   lemon: makeSprite([
     '.....G...',
     '..YYYG...',
@@ -269,7 +287,7 @@ const SPRITES = {
     '.BBBBBBBBBBB.',
     '..BB.BB.BB...',
     '..BB.BB.BB...',
-  ], { B: '#a5692a', D: '#7c4a1d', P: '#ff7fa5', W: '#ffffff' }),
+  ], { B: '#c9924f', D: '#8a5a2a', P: '#bfe0ff', W: '#ffffff' }),
 };
 
 // ---------------------------------------------------------------- audio
@@ -362,6 +380,47 @@ const audio = {
     this.blip(72, 0.1, 0.2, 0.16);
   },
 
+  sfxBark() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    [0, 0.16].forEach((delay) => {
+      const osc = this.ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(340, t0 + delay);
+      osc.frequency.exponentialRampToValueAtTime(150, t0 + delay + 0.12);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, t0 + delay);
+      gain.gain.linearRampToValueAtTime(0.18, t0 + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + delay + 0.15);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t0 + delay);
+      osc.stop(t0 + delay + 0.17);
+    });
+  },
+
+  sfxDrill() {
+    if (!this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const duration = 0.5;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.value = 2400;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t0);
+    const pulses = 10;
+    for (let i = 0; i < pulses; i++) {
+      const tt = t0 + i * (duration / pulses);
+      gain.gain.setValueAtTime(0.12, tt);
+      gain.gain.setValueAtTime(0.01, tt + (duration / pulses) * 0.55);
+    }
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration + 0.05);
+    osc.connect(gain);
+    gain.connect(this.master);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.08);
+  },
+
   sfxVictory() {
     this.blip(72, 0, 0.12, 0.15);
     this.blip(76, 0.12, 0.12, 0.15);
@@ -405,32 +464,25 @@ const audio = {
   },
 
   startMusic() {
-    // Espaço Lo-fi: melodia lenta e esparsa, ondas suaves e acordes flutuantes.
-    const LEAD = [72, 0, 0, 0, 0, 0, 0, 0, 74, 0, 0, 0, 71, 0, 0, 0,
-                  69, 0, 0, 0, 0, 0, 0, 0, 67, 0, 0, 0, 72, 0, 74, 0];
-    const stepDuration = 0.26;
-    const len = 32;
+    const LEAD = [76, 0, 79, 0, 83, 0, 79, 0, 76, 0, 79, 0, 84, 83, 79, 0,
+                  76, 0, 79, 0, 83, 0, 86, 0, 88, 0, 86, 83, 79, 0, 0, 0];
+    const BASS = [40, 43, 45, 43, 36, 40, 43, 47];
+    const stepDuration = 0.115;
     this.musicNextTime = this.ctx.currentTime + 0.1;
     if (this.musicTimer) clearInterval(this.musicTimer);
     this.musicTimer = setInterval(() => {
       if (!this.ctx) return;
       while (this.musicNextTime < this.ctx.currentTime + 0.2) {
-        const step = this.musicStep % len;
-        const d = stepDuration;
+        const step = this.musicStep % 32;
         const lead = LEAD[step];
-        if (lead) this.note(lead, this.musicNextTime, d * 3, 'sine', 0.05);
-        if (step === 0) {
-          [60, 64, 67, 71].forEach(n => this.note(n, this.musicNextTime, d * 15, 'sine', 0.028));
-          this.note(36, this.musicNextTime, d * 15, 'triangle', 0.05);
-        }
-        if (step === 16) {
-          [57, 60, 64, 67].forEach(n => this.note(n, this.musicNextTime, d * 15, 'sine', 0.028));
-          this.note(33, this.musicNextTime, d * 15, 'triangle', 0.05);
+        if (lead) this.note(lead, this.musicNextTime, stepDuration * 0.9, 'square', 0.05);
+        if (step % 4 === 0) {
+          this.note(BASS[(step / 4) % 8], this.musicNextTime, stepDuration * 3.5, 'triangle', 0.09);
         }
         this.musicNextTime += stepDuration;
         this.musicStep++;
       }
-    }, 25);
+    }, 80);
   },
 
   stopMusic() {
@@ -467,6 +519,11 @@ let currentCharacter = 'alexandre';
 
 const avatarSprites = {};
 let avatarsReady = false;
+
+const moonImg = new Image();
+let moonImgReady = false;
+moonImg.onload = () => { moonImgReady = true; };
+moonImg.src = 'https://images-assets.nasa.gov/image/as17-152-23311/as17-152-23311~medium.jpg';
 let attempts = 1;
 let time = 0;
 let camY = -60;
@@ -528,19 +585,20 @@ let neutralGamma = null;
 const TILT_DEAD_ZONE = 4;
 
 const NEBULAE = [
-  { x: 90, y: 300, r: 190, color: '123,92,255' },
-  { x: 400, y: 90, r: 150, color: '46,230,214' },
-  { x: 250, y: 560, r: 220, color: '255,110,199' },
-  { x: 60, y: 660, r: 160, color: '64,120,255' },
+  { x: 220, y: 300, r: 220, color: '123,92,255' },
+  { x: 980, y: 130, r: 190, color: '46,230,214' },
+  { x: 600, y: 560, r: 260, color: '255,110,199' },
+  { x: 150, y: 660, r: 190, color: '64,120,255' },
+  { x: 1050, y: 600, r: 200, color: '123,92,255' },
 ];
 
 const stars = [];
-for (let i = 0; i < 110; i++) {
+for (let i = 0; i < 220; i++) {
   stars.push({
     x: Math.random() * W,
     y: Math.random() * H,
-    parallax: i < 60 ? 0.35 : 0.7,
-    size: i < 60 ? 1 : 2,
+    parallax: i < 120 ? 0.35 : 0.7,
+    size: i < 120 ? 1 : 2,
     twinkle: Math.random() * Math.PI * 2,
   });
 }
@@ -588,6 +646,7 @@ function generateWorld(diffKey) {
         bobAmp: info.bob,
         bobPhase: Math.random() * Math.PI * 2,
         radius: info.radius,
+        soundPlayed: false,
       });
     }
   }
@@ -787,6 +846,10 @@ function updateObstacles(dt) {
     o.x += o.dir * o.speed * dt;
     if (o.dir > 0 && o.x > W + 40) o.x = -40;
     if (o.dir < 0 && o.x < -40) o.x = W + 40;
+    if (!o.soundPlayed && Math.abs(obstacleY(o) - rocket.y) < 220) {
+      if (o.type === 'dog') { audio.sfxBark(); o.soundPlayed = true; }
+      else if (o.type === 'dentist') { audio.sfxDrill(); o.soundPlayed = true; }
+    }
   }
 }
 
@@ -1146,6 +1209,21 @@ function drawBigMoon() {
   if (surfaceY < -420) return;
   const cx = moon.x;
   const cy = surfaceY + MOON_RADIUS;
+  if (moonImgReady) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, MOON_RADIUS, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(moonImg, cx - MOON_RADIUS, cy - MOON_RADIUS, MOON_RADIUS * 2, MOON_RADIUS * 2);
+    const shade = ctx.createRadialGradient(cx + MOON_RADIUS * 0.3, cy + MOON_RADIUS * 0.3, MOON_RADIUS * 0.15, cx, cy, MOON_RADIUS * 1.25);
+    shade.addColorStop(0, 'rgba(0,0,0,0)');
+    shade.addColorStop(0.7, 'rgba(0,0,10,0.1)');
+    shade.addColorStop(1, 'rgba(0,0,10,0.48)');
+    ctx.fillStyle = shade;
+    ctx.fillRect(cx - MOON_RADIUS, cy - MOON_RADIUS, MOON_RADIUS * 2, MOON_RADIUS * 2);
+    ctx.restore();
+    return;
+  }
   ctx.shadowColor = '#aebbdd';
   ctx.shadowBlur = 46;
   ctx.fillStyle = '#cfd3d9';
@@ -1406,11 +1484,18 @@ function speedColor(value, limit) {
 function drawHUD() {
   const activeStats = getActiveStats();
   const hudHeight = activeStats.extendedHud ? 82 : 62;
+  const hudPanelW = 360;
   ctx.fillStyle = 'rgba(8,12,26,0.62)';
-  roundRect(8, 8, W - 16, hudHeight, 8);
+  roundRect(8, 8, hudPanelW, hudHeight, 8);
   ctx.fill();
   ctx.strokeStyle = 'rgba(120,160,255,0.18)';
   ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(8,12,26,0.62)';
+  roundRect(W - 8 - 220, 8, 220, hudHeight, 8);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,160,255,0.18)';
   ctx.stroke();
 
   ctx.textAlign = 'left';
@@ -1811,9 +1896,12 @@ window.addEventListener('keydown', (e) => {
     else if (e.key === 'Escape') { state = 'character'; menuIndex = CHAR_KEYS.indexOf(currentCharacter); }
   } else if (state === 'slingshot') {
     if (e.key === ' ' || e.key === 'Enter') launchSlingshot();
+    else if (e.key === 'Escape') { audio.setThrust(false); state = 'character'; menuIndex = CHAR_KEYS.indexOf(currentCharacter); }
   } else if (state === 'win' || state === 'lose') {
     if (e.key === 'r' || e.key === 'R') startGame(currentDiff, true);
     else if (e.key === 'Enter' || e.key === 'Escape') state = 'title';
+  } else if (state === 'playing') {
+    if (e.key === 'Escape') { audio.setThrust(false); state = 'character'; menuIndex = CHAR_KEYS.indexOf(currentCharacter); }
   }
 
   if (e.key === 'ArrowLeft') keys.left = true;
