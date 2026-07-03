@@ -140,25 +140,30 @@ function makeSprite(rows, palette) {
   return canvas;
 }
 
+const ROCKET_ROWS = [
+  '.....R.....',
+  '....RRR....',
+  '...RRRRR...',
+  '...WWWWW...',
+  '..WWWWWWW..',
+  '..WWGGGWW..',
+  '..WWGGGWW..',
+  '..WWWWWWW..',
+  '..RRRRRRR..',
+  '..SWWWWWS..',
+  '..SWWWWWS..',
+  '.RSWWWWWSR.',
+  '.RRSWWWSRR.',
+  'RRRSWWWSRRR',
+  'RR..NNN..RR',
+  '....NNN....',
+];
+
+const FLAME1_ROWS = ['.OOO.', 'OOROO', '.RRR.', '..R..'];
+const FLAME2_ROWS = ['.OOO.', '.ORO.', '.RR..', '..R..'];
+
 const SPRITES = {
-  rocket: makeSprite([
-    '.....R.....',
-    '....RRR....',
-    '...RRRRR...',
-    '...WWWWW...',
-    '..WWWWWWW..',
-    '..WWGGGWW..',
-    '..WWGGGWW..',
-    '..WWWWWWW..',
-    '..RRRRRRR..',
-    '..SWWWWWS..',
-    '..SWWWWWS..',
-    '.RSWWWWWSR.',
-    '.RRSWWWSRR.',
-    'RRRSWWWSRRR',
-    'RR..NNN..RR',
-    '....NNN....',
-  ], { R: '#e63946', W: '#f4f6fb', S: '#c9d0dd', G: '#8fd8ff', N: '#3a3a44' }),
+  rocket: makeSprite(ROCKET_ROWS, { R: '#e63946', W: '#f4f6fb', S: '#c9d0dd', G: '#8fd8ff', N: '#3a3a44' }),
   flame1: makeSprite([
     '.OOO.',
     'OOROO',
@@ -299,6 +304,167 @@ const SPRITES = {
     '..BB.BB.BB...',
   ], { B: '#c9924f', D: '#8a5a2a', P: '#bfe0ff', W: '#ffffff' }),
 };
+
+// ---------------------------------------------------------------- shop catalog
+
+const ROCKET_SKINS = {
+  default: {
+    label: 'CLÁSSICO CAPIM',
+    desc: 'O foguete vermelho original. Ícone da frota.',
+    price: 0,
+    palette: { R: '#e63946', W: '#f4f6fb', S: '#c9d0dd', G: '#8fd8ff', N: '#3a3a44' },
+  },
+  lemon: {
+    label: 'LIMONADA ORBITAL',
+    desc: 'Amarelo solar com janela verde-limão.',
+    price: 25,
+    palette: { R: '#ffd166', W: '#fff8e0', S: '#e8c84a', G: '#57c74f', N: '#3a5a2a' },
+  },
+  neon: {
+    label: 'NEON SYNTHWAVE',
+    desc: 'Roxo e ciano para decolagens noturnas.',
+    price: 40,
+    palette: { R: '#b44aff', W: '#f0e6ff', S: '#00f5d4', G: '#00f5d4', N: '#2a1a44' },
+  },
+  stealth: {
+    label: 'FURTIVO NOTURNO',
+    desc: 'Cinza escuro com detalhes vermelhos.',
+    price: 35,
+    palette: { R: '#5a5a66', W: '#8892a6', S: '#3a3a44', G: '#c0392b', N: '#1a1a22' },
+  },
+  golden: {
+    label: 'EDIÇÃO OURO',
+    desc: 'Revestimento dourado premium.',
+    price: 60,
+    palette: { R: '#ffb020', W: '#fff4d6', S: '#e8a020', G: '#ffd166', N: '#8a6020' },
+  },
+};
+const SKIN_KEYS = Object.keys(ROCKET_SKINS);
+
+const TRAILS = {
+  default: {
+    label: 'CHAMA PADRÃO',
+    desc: 'Exaustão laranja e vermelha clássica.',
+    price: 0,
+    colors: ['#ffd166', '#ff7b3a', '#ffffff'],
+    flamePalette: { O: '#ffb020', R: '#ff4020' },
+  },
+  acid: {
+    label: 'EXAUSTOR ÁCIDO',
+    desc: 'Fumaça verde-limão tóxica.',
+    price: 20,
+    colors: ['#57c74f', '#ffd166', '#a8e063'],
+    flamePalette: { O: '#a8e063', R: '#57c74f' },
+  },
+  plasma: {
+    label: 'PLASMA AZUL',
+    desc: 'Rastro frio de ionização.',
+    price: 35,
+    colors: ['#4cc9f0', '#7209b7', '#ffffff'],
+    flamePalette: { O: '#4cc9f0', R: '#7209b7' },
+  },
+  ember: {
+    label: 'BRASA INTENSA',
+    desc: 'Chamas profundas e violentas.',
+    price: 30,
+    colors: ['#ff4020', '#ff7b3a', '#ffd166'],
+    flamePalette: { O: '#ff7b3a', R: '#c0392b' },
+  },
+  rainbow: {
+    label: 'ARCO-ÍRIS',
+    desc: 'Cores alternadas a cada frame.',
+    price: 50,
+    rainbow: true,
+    colors: ['#ff4d5e', '#ffd166', '#57c74f', '#4cc9f0', '#b44aff', '#ff7fd1'],
+    flamePalette: { O: '#ffd166', R: '#b44aff' },
+  },
+};
+const TRAIL_KEYS = Object.keys(TRAILS);
+
+const ACCESSORIES = {
+  none: {
+    label: 'SEM ACESSÓRIO',
+    desc: 'Visual limpo, sem extras.',
+    price: 0,
+    draw() {},
+  },
+  antenna: {
+    label: 'ANTENA VHF',
+    desc: 'Comunicação com a base.',
+    price: 15,
+    draw(ctx, scale) {
+      const s = scale || 1;
+      ctx.strokeStyle = '#8892a6';
+      ctx.lineWidth = 2 * s;
+      ctx.beginPath();
+      ctx.moveTo(0, -18 * s);
+      ctx.lineTo(0, -24 * s);
+      ctx.stroke();
+      ctx.fillStyle = '#ff5050';
+      ctx.fillRect(-1 * s, -25 * s, 2 * s, 2 * s);
+    },
+  },
+  flag: {
+    label: 'BANDEIRA LIMÃO',
+    desc: 'Amarelo e verde no mastro.',
+    price: 20,
+    draw(ctx, scale) {
+      const s = scale || 1;
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(8 * s, -14 * s, 6 * s, 4 * s);
+      ctx.fillStyle = '#57c74f';
+      ctx.fillRect(9 * s, -13 * s, 2 * s, 2 * s);
+    },
+  },
+  halo: {
+    label: 'AURÉOLA DOURADA',
+    desc: 'Brilho místico ao redor da nave.',
+    price: 25,
+    draw(ctx, scale) {
+      const s = scale || 1;
+      ctx.strokeStyle = 'rgba(255,209,102,0.4)';
+      ctx.lineWidth = 2 * s;
+      ctx.beginPath();
+      ctx.arc(0, 0, 20 * s, 0, Math.PI * 2);
+      ctx.stroke();
+    },
+  },
+  wings: {
+    label: 'ASAS MINI',
+    desc: 'Estabilizadores laterais pixelados.',
+    price: 35,
+    draw(ctx, scale) {
+      const s = scale || 1;
+      ctx.fillStyle = '#cfe3ff';
+      ctx.fillRect(-16 * s, -2 * s, 4 * s, 8 * s);
+      ctx.fillRect(12 * s, -2 * s, 4 * s, 8 * s);
+    },
+  },
+};
+const ACCESSORY_KEYS = Object.keys(ACCESSORIES);
+
+const SHOP_CATEGORIES = ['rocketSkins', 'trails', 'accessories'];
+const SHOP_TAB_LABELS = ['NAVES', 'TRILHAS', 'ACESSÓRIOS'];
+const SHOP_ITEM_KEYS = { rocketSkins: SKIN_KEYS, trails: TRAIL_KEYS, accessories: ACCESSORY_KEYS };
+const SHOP_CATALOGS = { rocketSkins: ROCKET_SKINS, trails: TRAILS, accessories: ACCESSORIES };
+const EQUIP_KEY = { rocketSkins: 'rocketSkin', trails: 'trail', accessories: 'accessory' };
+const DEFAULT_OWNED = { rocketSkins: 'default', trails: 'default', accessories: 'none' };
+
+function buildShopSprites() {
+  ROCKET_SKINS.default.sprite = SPRITES.rocket;
+  for (const key of SKIN_KEYS) {
+    if (key === 'default') continue;
+    ROCKET_SKINS[key].sprite = makeSprite(ROCKET_ROWS, ROCKET_SKINS[key].palette);
+  }
+  for (const key of TRAIL_KEYS) {
+    const trail = TRAILS[key];
+    trail.flames = {
+      flame1: makeSprite(FLAME1_ROWS, trail.flamePalette),
+      flame2: makeSprite(FLAME2_ROWS, trail.flamePalette),
+    };
+  }
+}
+buildShopSprites();
 
 // ---------------------------------------------------------------- audio
 
@@ -564,10 +730,13 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
-let state = 'title'; // title | character | difficulty | playing | slingshot | exploding | win | lose
+let state = 'title'; // title | character | difficulty | shop | playing | slingshot | exploding | win | lose
 let menuIndex = 0;
 let currentDiff = 'easy';
 let currentCharacter = 'alexandre';
+let shopTab = 0;
+let shopIndex = 0;
+let shopReturnState = 'title';
 
 const avatarSprites = {};
 let avatarsReady = false;
@@ -675,7 +844,69 @@ const COIN_SPAWN_BY_DIFF = {
 };
 
 function defaultWallet() {
-  return { version: 1, coins: 0, totalEarned: 0 };
+  return {
+    version: 2,
+    coins: 0,
+    totalEarned: 0,
+    inventory: { rocketSkins: ['default'], trails: ['default'], accessories: ['none'] },
+    equipped: { rocketSkin: 'default', trail: 'default', accessory: 'none' },
+  };
+}
+
+function migrateWalletV1(data) {
+  return sanitizeWallet({
+    version: 2,
+    coins: data.coins,
+    totalEarned: data.totalEarned,
+    inventory: { rocketSkins: ['default'], trails: ['default'], accessories: ['none'] },
+    equipped: { rocketSkin: 'default', trail: 'default', accessory: 'none' },
+  });
+}
+
+function isValidWalletV2(data) {
+  return data.version === 2
+    && typeof data.coins === 'number'
+    && typeof data.totalEarned === 'number'
+    && data.inventory
+    && Array.isArray(data.inventory.rocketSkins)
+    && Array.isArray(data.inventory.trails)
+    && Array.isArray(data.inventory.accessories)
+    && data.equipped
+    && typeof data.equipped.rocketSkin === 'string'
+    && typeof data.equipped.trail === 'string'
+    && typeof data.equipped.accessory === 'string';
+}
+
+function sanitizeWallet(data) {
+  const coins = (typeof data.coins === 'number' && Number.isFinite(data.coins) && data.coins >= 0)
+    ? data.coins
+    : 0;
+  const totalEarned = (typeof data.totalEarned === 'number' && Number.isFinite(data.totalEarned) && data.totalEarned >= 0)
+    ? data.totalEarned
+    : 0;
+  const inventory = {};
+  const equipped = {};
+  for (const cat of SHOP_CATEGORIES) {
+    const catalog = SHOP_CATALOGS[cat];
+    const fallback = DEFAULT_OWNED[cat];
+    const equipKey = EQUIP_KEY[cat];
+    const seen = new Set();
+    const list = [];
+    const rawList = Array.isArray(data.inventory?.[cat]) ? data.inventory[cat] : [];
+    for (const id of rawList) {
+      if (typeof id === 'string' && catalog[id] && !seen.has(id)) {
+        seen.add(id);
+        list.push(id);
+      }
+    }
+    if (!seen.has(fallback)) list.unshift(fallback);
+    inventory[cat] = list;
+    const equippedId = data.equipped?.[equipKey];
+    equipped[equipKey] = (typeof equippedId === 'string' && list.includes(equippedId))
+      ? equippedId
+      : fallback;
+  }
+  return { version: 2, coins, totalEarned, inventory, equipped };
 }
 
 function loadSave() {
@@ -686,11 +917,17 @@ function loadSave() {
       return;
     }
     const data = JSON.parse(raw);
-    if (data.version !== 1 || typeof data.coins !== 'number' || typeof data.totalEarned !== 'number') {
+    if (data.version === 1 && typeof data.coins === 'number' && typeof data.totalEarned === 'number') {
+      wallet = migrateWalletV1(data);
+      saveWallet();
+      return;
+    }
+    if (!isValidWalletV2(data)) {
       wallet = defaultWallet();
       return;
     }
-    wallet = data;
+    wallet = sanitizeWallet(data);
+    if (JSON.stringify(wallet) !== JSON.stringify(data)) saveWallet();
   } catch {
     wallet = defaultWallet();
   }
@@ -700,6 +937,427 @@ function saveWallet() {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(wallet));
   } catch { /* quota or private browsing */ }
+}
+
+// ---------------------------------------------------------------- shop
+
+function getEquippedRocketSprite() {
+  const id = wallet?.equipped?.rocketSkin || 'default';
+  return ROCKET_SKINS[id]?.sprite || SPRITES.rocket;
+}
+
+function getEquippedFlames() {
+  const id = wallet?.equipped?.trail || 'default';
+  return TRAILS[id]?.flames || { flame1: SPRITES.flame1, flame2: SPRITES.flame2 };
+}
+
+function getActiveTrailColors() {
+  const id = wallet?.equipped?.trail || 'default';
+  const trail = TRAILS[id];
+  if (!trail) return ['#ffd166', '#ff7b3a', '#ffffff'];
+  if (trail.rainbow) {
+    const colors = trail.colors;
+    return [colors[Math.floor(time * 8) % colors.length], colors[(Math.floor(time * 8) + 2) % colors.length]];
+  }
+  return trail.colors;
+}
+
+function isOwned(category, id) {
+  return wallet.inventory[category].includes(id);
+}
+
+function canAfford(price) {
+  return wallet.coins >= price;
+}
+
+function equipItem(category, id, silent) {
+  if (!isOwned(category, id)) return false;
+  const equipKey = EQUIP_KEY[category];
+  if (wallet.equipped[equipKey] === id) return false;
+  wallet.equipped[equipKey] = id;
+  saveWallet();
+  if (!silent) {
+    addToast('EQUIPADO!');
+    audio.sfxPickup();
+  }
+  return true;
+}
+
+function purchaseItem(category, id) {
+  const item = SHOP_CATALOGS[category]?.[id];
+  if (!item) return false;
+  if (isOwned(category, id)) return equipItem(category, id);
+
+  if (!canAfford(item.price)) {
+    addToast('MOEDAS INSUFICIENTES');
+    return false;
+  }
+
+  const equipKey = EQUIP_KEY[category];
+  wallet.coins -= item.price;
+  wallet.inventory[category].push(id);
+  wallet.equipped[equipKey] = id;
+  saveWallet();
+  addToast('COMPRADO!');
+  audio.sfxPickup();
+  return true;
+}
+
+function openShop(from) {
+  shopReturnState = from;
+  shopTab = 0;
+  shopIndex = 0;
+  state = 'shop';
+}
+
+function getShopItemKeys() {
+  return SHOP_ITEM_KEYS[SHOP_CATEGORIES[shopTab]];
+}
+
+function getShopSelectedId() {
+  const keys = getShopItemKeys();
+  return keys[shopIndex] || keys[0];
+}
+
+function shopGridNav(key, index, count, cols) {
+  const col = index % cols;
+  if (key === 'ArrowRight' && col < cols - 1 && index + 1 < count) return index + 1;
+  if (key === 'ArrowLeft' && col > 0) return index - 1;
+  if (key === 'ArrowDown' && index + cols < count) return index + cols;
+  if (key === 'ArrowUp' && index - cols >= 0) return index - cols;
+  return index;
+}
+
+function getShopLayout() {
+  return {
+    tabY: 68,
+    listX: 48,
+    listY: 128,
+    listW: 680,
+    listH: 520,
+    previewX: 768,
+    previewY: 128,
+    previewW: 364,
+    previewH: 520,
+    cols: 2,
+    cardH: 96,
+    gap: 14,
+  };
+}
+
+function shopCardRect(i) {
+  const layout = getShopLayout();
+  const cols = layout.cols;
+  const col = i % cols;
+  const row = Math.floor(i / cols);
+  const cardW = (layout.listW - layout.gap) / cols;
+  return {
+    x: layout.listX + col * (cardW + layout.gap),
+    y: layout.listY + row * (layout.cardH + layout.gap),
+    w: cardW,
+    h: layout.cardH,
+  };
+}
+
+function isEquipped(category, id) {
+  return wallet.equipped[EQUIP_KEY[category]] === id;
+}
+
+function drawCosmeticRocketAt(cx, cy, angle, scale, skinId, trailId, accessoryId, showFlame) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  const skinSprite = ROCKET_SKINS[skinId]?.sprite || SPRITES.rocket;
+  const hw = 11 * scale;
+  const hh = 16 * scale;
+  ctx.drawImage(skinSprite, -hw, -hh, hw * 2, hh * 2);
+  const acc = ACCESSORIES[accessoryId || 'none'];
+  if (acc && acc.draw) acc.draw(ctx, scale);
+  if (showFlame) {
+    const flames = TRAILS[trailId]?.flames || { flame1: SPRITES.flame1, flame2: SPRITES.flame2 };
+    const flame = Math.floor(time * 14) % 2 === 0 ? flames.flame1 : flames.flame2;
+    ctx.drawImage(flame, -5 * scale, 15 * scale, 10 * scale, 8 * scale);
+  }
+  ctx.restore();
+}
+
+function drawShopItemCard(category, id, rect, selected) {
+  const item = SHOP_CATALOGS[category][id];
+  const { x, y, w, h } = rect;
+  const pulse = selected ? 0.5 + 0.5 * Math.sin(time * 4) : 0;
+  const owned = isOwned(category, id);
+  const equipped = isEquipped(category, id);
+
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, selected ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.06)');
+  grad.addColorStop(1, selected ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)');
+  ctx.fillStyle = grad;
+  roundRect(x, y, w, h, 10);
+  ctx.fill();
+
+  if (selected) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,209,102,0.45)';
+    ctx.shadowBlur = 8 + pulse * 8;
+    ctx.strokeStyle = 'rgba(255,209,102,0.85)';
+    ctx.lineWidth = 2;
+    roundRect(x, y, w, h, 10);
+    ctx.stroke();
+    ctx.restore();
+    drawCardCornerAccents(x, y, w, pulse);
+  } else {
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 10);
+    ctx.stroke();
+  }
+
+  const previewScale = 1.8;
+  if (category === 'rocketSkins') {
+    const sprite = ROCKET_SKINS[id]?.sprite || SPRITES.rocket;
+    ctx.drawImage(sprite, x + 12, y + h / 2 - 14, 22 * previewScale / 2, 32 * previewScale / 2);
+  } else if (category === 'trails') {
+    const flames = TRAILS[id]?.flames || { flame1: SPRITES.flame1, flame2: SPRITES.flame2 };
+    const flame = Math.floor(time * 10) % 2 === 0 ? flames.flame1 : flames.flame2;
+    ctx.drawImage(flame, x + 16, y + h / 2 - 8, 20, 16);
+  } else if (category === 'accessories' && id !== 'none') {
+    ctx.save();
+    ctx.translate(x + 28, y + h / 2);
+    ACCESSORIES[id].draw(ctx, 1.2);
+    ctx.restore();
+    const sprite = getEquippedRocketSprite();
+    ctx.globalAlpha = 0.35;
+    ctx.drawImage(sprite, x + 12, y + h / 2 - 14, 19, 28);
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.font = '11px monospace';
+    ctx.fillStyle = '#5a6478';
+    ctx.textAlign = 'center';
+    ctx.fillText('—', x + 28, y + h / 2 + 4);
+    ctx.textAlign = 'left';
+  }
+
+  ctx.font = selected ? 'bold 12px monospace' : '12px monospace';
+  ctx.fillStyle = selected ? '#ffffff' : '#8892a6';
+  ctx.fillText(item.label, x + 56, y + 28);
+
+  ctx.font = '10px monospace';
+  if (equipped) {
+    ctx.fillStyle = '#57c74f';
+    ctx.fillText('EQUIPADO', x + 56, y + 48);
+  } else if (owned) {
+    ctx.fillStyle = '#8fa3c8';
+    ctx.fillText('ADQUIRIDO', x + 56, y + 48);
+  } else if (item.price === 0) {
+    ctx.fillStyle = '#8fa3c8';
+    ctx.fillText('GRÁTIS', x + 56, y + 48);
+  } else {
+    ctx.fillStyle = '#ffd166';
+    ctx.drawImage(SPRITES.coin, x + 56, y + 36, 10, 10);
+    ctx.fillText(String(item.price), x + 70, y + 48);
+  }
+}
+
+function getTitleShopButtonRect() {
+  return { x: 130, y: H - 36, w: 80, h: 28 };
+}
+
+function getShopBackButtonRect() {
+  return { x: 48, y: 88, w: 100, h: 24 };
+}
+
+function shopActionButtonRect() {
+  const layout = getShopLayout();
+  return {
+    x: layout.previewX + 24,
+    y: layout.previewY + layout.previewH - 72,
+    w: layout.previewW - 48,
+    h: 40,
+  };
+}
+
+function leaveShop() {
+  state = shopReturnState;
+  if (shopReturnState === 'character') menuIndex = CHAR_KEYS.indexOf(currentCharacter);
+}
+
+function handleShopConfirm() {
+  const category = SHOP_CATEGORIES[shopTab];
+  const id = getShopSelectedId();
+  const item = SHOP_CATALOGS[category][id];
+  if (isOwned(category, id)) {
+    equipItem(category, id);
+  } else if (canAfford(item.price)) {
+    purchaseItem(category, id);
+  } else {
+    addToast('MOEDAS INSUFICIENTES');
+  }
+}
+
+function handleShopTap(x, y) {
+  const back = getShopBackButtonRect();
+  if (x >= back.x && x <= back.x + back.w && y >= back.y && y <= back.y + back.h) {
+    leaveShop();
+    return;
+  }
+
+  const layout = getShopLayout();
+  const tabW = 160;
+  const tabStartX = (W - tabW * 3) / 2;
+  for (let t = 0; t < 3; t++) {
+    const tx = tabStartX + t * tabW;
+    if (x >= tx && x <= tx + tabW - 8 && y >= layout.tabY - 20 && y <= layout.tabY + 8) {
+      shopTab = t;
+      shopIndex = 0;
+      return;
+    }
+  }
+
+  const keys = getShopItemKeys();
+  for (let i = 0; i < keys.length; i++) {
+    const r = shopCardRect(i);
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+      if (i === shopIndex) handleShopConfirm();
+      else shopIndex = i;
+      return;
+    }
+  }
+
+  const btn = shopActionButtonRect();
+  if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+    handleShopConfirm();
+  }
+}
+
+function renderShop() {
+  drawBackground(time * 12);
+  const layout = getShopLayout();
+  const category = SHOP_CATEGORIES[shopTab];
+  const selectedId = getShopSelectedId();
+  const selectedItem = SHOP_CATALOGS[category][selectedId];
+
+  ctx.font = 'bold 22px monospace';
+  ctx.fillStyle = '#ffd166';
+  ctx.textAlign = 'left';
+  ctx.fillText('LOJA DE COSMÉTICOS', 48, 42);
+  ctx.font = 'bold 12px monospace';
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText('MOEDAS:', W - 180, 42);
+  ctx.drawImage(SPRITES.coin, W - 110, 30, 14, 14);
+  ctx.fillStyle = '#ffd166';
+  ctx.fillText(String(wallet.coins), W - 92, 42);
+  ctx.textAlign = 'left';
+
+  ctx.font = 'bold 11px monospace';
+  ctx.fillStyle = '#8892a6';
+  ctx.fillText('← VOLTAR', 48, 100);
+
+  const tabW = 160;
+  const tabStartX = (W - tabW * 3) / 2;
+  for (let t = 0; t < 3; t++) {
+    const tx = tabStartX + t * tabW;
+    const active = t === shopTab;
+    ctx.fillStyle = active ? 'rgba(255,209,102,0.15)' : 'rgba(255,255,255,0.04)';
+    roundRect(tx, layout.tabY - 24, tabW - 8, 28, 6);
+    ctx.fill();
+    if (active) {
+      ctx.strokeStyle = 'rgba(255,209,102,0.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.font = active ? 'bold 11px monospace' : '11px monospace';
+    ctx.fillStyle = active ? '#ffd166' : '#8892a6';
+    ctx.textAlign = 'center';
+    ctx.fillText(SHOP_TAB_LABELS[t], tx + (tabW - 8) / 2, layout.tabY - 6);
+  }
+  ctx.textAlign = 'left';
+
+  const keys = getShopItemKeys();
+  keys.forEach((id, i) => drawShopItemCard(category, id, shopCardRect(i), i === shopIndex));
+
+  ctx.fillStyle = 'rgba(8,12,26,0.62)';
+  roundRect(layout.previewX, layout.previewY, layout.previewW, layout.previewH, 12);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,160,255,0.18)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.font = 'bold 14px monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.fillText('PREVIEW', layout.previewX + layout.previewW / 2, layout.previewY + 28);
+
+  const previewSkin = shopTab === 0 ? selectedId : wallet.equipped.rocketSkin;
+  const previewTrail = shopTab === 1 ? selectedId : wallet.equipped.trail;
+  const previewAcc = shopTab === 2 ? selectedId : wallet.equipped.accessory;
+  const bobAngle = Math.sin(time * 1.5) * 0.12;
+  drawCosmeticRocketAt(
+    layout.previewX + layout.previewW / 2,
+    layout.previewY + 200,
+    bobAngle,
+    3,
+    previewSkin,
+    previewTrail,
+    previewAcc,
+    true
+  );
+
+  ctx.font = 'bold 13px monospace';
+  ctx.fillStyle = '#ffd166';
+  ctx.fillText(selectedItem.label, layout.previewX + layout.previewW / 2, layout.previewY + 320);
+  drawCenteredWrappedTextAt(
+    selectedItem.desc,
+    layout.previewX + layout.previewW / 2,
+    layout.previewY + 342,
+    layout.previewW - 40,
+    '11px monospace',
+    '#8fa3c8',
+    14,
+    2
+  );
+
+  const owned = isOwned(category, selectedId);
+  const equipped = isEquipped(category, selectedId);
+  const unaffordable = !owned && !canAfford(selectedItem.price);
+  const btn = shopActionButtonRect();
+  let btnLabel = 'COMPRAR (' + selectedItem.price + ')';
+  let btnFill = 'rgba(255,209,102,0.15)';
+  let btnStroke = 'rgba(255,209,102,0.4)';
+  let btnColor = '#ffd166';
+  if (equipped) {
+    btnLabel = 'EQUIPADO';
+    btnFill = 'rgba(87,199,79,0.2)';
+    btnStroke = 'rgba(87,199,79,0.5)';
+    btnColor = '#57c74f';
+  } else if (owned || selectedItem.price === 0) {
+    btnLabel = 'EQUIPAR';
+  } else if (unaffordable) {
+    btnLabel = 'FALTAM ' + (selectedItem.price - wallet.coins);
+    btnFill = 'rgba(90,100,120,0.2)';
+    btnStroke = 'rgba(90,100,120,0.5)';
+    btnColor = '#5a6478';
+  }
+  ctx.fillStyle = btnFill;
+  roundRect(btn.x, btn.y, btn.w, btn.h, 8);
+  ctx.fill();
+  ctx.strokeStyle = btnStroke;
+  ctx.stroke();
+  ctx.font = 'bold 12px monospace';
+  ctx.fillStyle = btnColor;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(btnLabel, btn.x + btn.w / 2, btn.y + btn.h / 2);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+
+  drawCenteredText([[
+    isMobile
+      ? 'TOQUE PARA SELECIONAR · TOQUE DE NOVO OU NO BOTÃO PARA COMPRAR/EQUIPAR · VOLTAR'
+      : '←/→ ITENS · Q/E ABAS · ENTER AÇÃO · ESC VOLTAR · BACKSPACE TÍTULO',
+    688, 11, '#8892a6',
+  ]]);
+  drawToasts();
+  drawVignette();
 }
 
 function distToPlatform(x, y, p) {
@@ -1053,7 +1711,7 @@ function crash(reason) {
 function spawnThrustParticles() {
   const nozzleX = rocket.x - Math.sin(rocket.angle) * 18;
   const nozzleY = rocket.y - Math.cos(rocket.angle) * 18;
-  const colors = ['#ffd166', '#ff7b3a', '#ffffff'];
+  const colors = getActiveTrailColors();
   for (let i = 0; i < 2; i++) {
     thrustParticles.push({
       x: nozzleX,
@@ -1061,7 +1719,7 @@ function spawnThrustParticles() {
       vx: rocket.vx - Math.sin(rocket.angle) * 90 + (Math.random() * 2 - 1) * 30,
       vy: rocket.vy - Math.cos(rocket.angle) * 90 + (Math.random() * 2 - 1) * 30,
       life: 0.3 + Math.random() * 0.2,
-      color: colors[Math.floor(Math.random() * 3)],
+      color: colors[Math.floor(Math.random() * colors.length)],
     });
   }
 }
@@ -1772,12 +2430,17 @@ function drawObstacles() {
 function drawRocket() {
   const x = rocket.x;
   const y = sy(rocket.y);
+  const skinSprite = getEquippedRocketSprite();
+  const flames = getEquippedFlames();
+  const accessoryId = wallet?.equipped?.accessory || 'none';
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rocket.angle);
-  ctx.drawImage(SPRITES.rocket, -11, -16, 22, 32);
+  ctx.drawImage(skinSprite, -11, -16, 22, 32);
+  const acc = ACCESSORIES[accessoryId];
+  if (acc && acc.draw) acc.draw(ctx, 1);
   if (state === 'playing' && !rocket.landed && keys.up && rocket.fuel > 0) {
-    const flame = Math.floor(time * 14) % 2 === 0 ? SPRITES.flame1 : SPRITES.flame2;
+    const flame = Math.floor(time * 14) % 2 === 0 ? flames.flame1 : flames.flame2;
     ctx.drawImage(flame, -5, 15, 10, 8);
   }
   ctx.restore();
@@ -2079,8 +2742,15 @@ function renderTitle() {
   ]);
   ctx.save();
   ctx.translate(W / 2, 400);
-  ctx.drawImage(SPRITES.rocket, -33, -48, 66, 96);
-  const flame = Math.floor(time * 10) % 2 === 0 ? SPRITES.flame1 : SPRITES.flame2;
+  const titleSkin = wallet?.equipped?.rocketSkin || 'default';
+  const titleTrail = wallet?.equipped?.trail || 'default';
+  const titleAcc = wallet?.equipped?.accessory || 'none';
+  const titleFlames = TRAILS[titleTrail]?.flames || { flame1: SPRITES.flame1, flame2: SPRITES.flame2 };
+  const titleSprite = ROCKET_SKINS[titleSkin]?.sprite || SPRITES.rocket;
+  ctx.drawImage(titleSprite, -33, -48, 66, 96);
+  const acc = ACCESSORIES[titleAcc];
+  if (acc && acc.draw) acc.draw(ctx, 3);
+  const flame = Math.floor(time * 10) % 2 === 0 ? titleFlames.flame1 : titleFlames.flame2;
   ctx.drawImage(flame, -15, 46, 30, 24);
   ctx.restore();
   if (Math.floor(time * 2) % 2 === 0) {
@@ -2094,6 +2764,18 @@ function renderTitle() {
   ctx.fillStyle = '#8fa3c8';
   ctx.textAlign = 'left';
   ctx.fillText('MOEDAS: ' + wallet.coins, 20, H - 24);
+  const shopBtn = getTitleShopButtonRect();
+  ctx.fillStyle = 'rgba(255,209,102,0.15)';
+  roundRect(shopBtn.x, shopBtn.y, shopBtn.w, shopBtn.h, 6);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,209,102,0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.font = 'bold 11px monospace';
+  ctx.fillStyle = '#ffd166';
+  ctx.textAlign = 'center';
+  ctx.fillText('LOJA', shopBtn.x + shopBtn.w / 2, shopBtn.y + 18);
+  ctx.textAlign = 'left';
   drawVignette();
 }
 
@@ -2225,12 +2907,21 @@ function renderCharacterMenu() {
   const layout = getCharacterMenuLayout();
 
   drawBackground(time * 12);
+  ctx.font = 'bold 11px monospace';
+  ctx.fillStyle = '#8892a6';
+  ctx.textAlign = 'left';
+  ctx.fillText('← TÍTULO', 48, 100);
   drawCenteredText([['ESCOLHA O PILOTO', 115, 28, '#ffd166', true]]);
   CHAR_KEYS.forEach((key, i) => drawCharacterCard(key, layout.cardRect(i), i === menuIndex));
   drawCenteredText([[
-    isMobile ? 'TOQUE NO PILOTO PARA CONTINUAR' : '↑/↓/←/→ SELECIONAR - 1-4 ATALHO - ENTER CONTINUAR - ESC VOLTAR',
+    isMobile ? 'TOQUE NO PILOTO · TOQUE LOJA NO CANTO' : '↑/↓/←/→ SELECIONAR - 1-4 ATALHO - ENTER CONTINUAR - ESC LOJA - BACKSPACE TÍTULO',
     680, 11, '#8892a6',
   ]]);
+  ctx.font = 'bold 11px monospace';
+  ctx.fillStyle = '#ffd166';
+  ctx.textAlign = 'right';
+  ctx.fillText('LOJA (ESC)', W - 48, 100);
+  ctx.textAlign = 'left';
   drawVignette();
 }
 
@@ -2333,6 +3024,7 @@ function render() {
   if (state === 'title') renderTitle();
   else if (state === 'character') renderCharacterMenu();
   else if (state === 'difficulty') renderMenu();
+  else if (state === 'shop') renderShop();
   else renderWorld();
 }
 
@@ -2370,6 +3062,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'm' || e.key === 'M') { audio.toggleMute(); return; }
 
   if (state === 'title') {
+    if (e.key === 'l' || e.key === 'L') { openShop('title'); return; }
     if (e.key === 'Enter' || e.key === ' ') { state = 'character'; menuIndex = 0; }
   } else if (state === 'character') {
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.repeat) {
@@ -2383,7 +3076,26 @@ window.addEventListener('keydown', (e) => {
       currentCharacter = CHAR_KEYS[menuIndex];
       state = 'difficulty';
       menuIndex = 0;
-    } else if (e.key === 'Escape') state = 'title';
+    } else if (e.key === 'Escape') { openShop('character'); }
+    else if (e.key === 'Backspace') { state = 'title'; }
+  } else if (state === 'shop') {
+    const keys = getShopItemKeys();
+    const cols = getShopLayout().cols;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      if (!e.repeat) shopIndex = shopGridNav(e.key, shopIndex, keys.length, cols);
+    } else if (e.key === 'q' || e.key === 'Q' || e.key === 'Tab') {
+      shopTab = (shopTab + 2) % 3;
+      shopIndex = 0;
+    } else if (e.key === 'e' || e.key === 'E') {
+      shopTab = (shopTab + 1) % 3;
+      shopIndex = 0;
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      handleShopConfirm();
+    } else if (e.key === 'Escape') {
+      leaveShop();
+    } else if (e.key === 'Backspace') {
+      state = 'title';
+    }
   } else if (state === 'difficulty') {
     if (e.key === 'ArrowUp' && !e.repeat) menuIndex = (menuIndex + 2) % 3;
     else if (e.key === 'ArrowDown' && !e.repeat) menuIndex = (menuIndex + 1) % 3;
@@ -2422,9 +3134,22 @@ function canvasPos(e) {
 
 function handleMenuTap(x, y) {
   if (state === 'title') {
+    const shopBtn = getTitleShopButtonRect();
+    if (x >= shopBtn.x && x <= shopBtn.x + shopBtn.w && y >= shopBtn.y && y <= shopBtn.y + shopBtn.h) {
+      openShop('title');
+      return;
+    }
     state = 'character';
     menuIndex = 0;
   } else if (state === 'character') {
+    if (x >= 48 && x <= 140 && y >= 88 && y <= 108) {
+      state = 'title';
+      return;
+    }
+    if (x >= W - 160 && x <= W - 48 && y >= 88 && y <= 108) {
+      openShop('character');
+      return;
+    }
     const layout = getCharacterMenuLayout();
     for (let i = 0; i < CHAR_KEYS.length; i++) {
       const r = layout.cardRect(i);
@@ -2435,6 +3160,8 @@ function handleMenuTap(x, y) {
         return;
       }
     }
+  } else if (state === 'shop') {
+    handleShopTap(x, y);
   } else if (state === 'difficulty') {
     for (let i = 0; i < DIFF_KEYS.length; i++) {
       const cy = 260 + i * 90;
@@ -2584,6 +3311,12 @@ window.__rl = {
     wallet.totalEarned += n;
     saveWallet();
   },
+  SHOP: { ROCKET_SKINS, TRAILS, ACCESSORIES, SKIN_KEYS, TRAIL_KEYS, ACCESSORY_KEYS },
+  purchaseItem,
+  equipItem,
+  openShop,
+  get equipped() { return wallet.equipped; },
+  get inventory() { return wallet.inventory; },
   launchSlingshot,
 };
 </script>
