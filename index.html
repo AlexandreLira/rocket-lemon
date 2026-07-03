@@ -836,7 +836,12 @@ const keys = { left: false, right: false, up: false, down: false };
 const isMobile = matchMedia('(pointer: coarse)').matches;
 let tiltEnabled = false;
 let neutralGamma = null;
-const TILT_DEAD_ZONE = 4;
+let smoothGamma = null;
+let tiltInput = 0;
+const TILT_DEAD_ZONE = 10;
+const TILT_FULL_ANGLE = 28;
+const TILT_SMOOTH = 0.18;
+const TILT_SPEED_MULT = 0.7;
 
 const NEBULAE = [
   { x: 220, y: 300, r: 220, color: '123,92,255' },
@@ -1632,6 +1637,8 @@ function startGame(diffKey, isRetry) {
   keys.up = false;
   keys.down = false;
   neutralGamma = null;
+  smoothGamma = null;
+  tiltInput = 0;
   if (isMobile) enableTilt();
   stateBeforePause = 'playing';
   countdownLabel = 'DECOLAGEM EM...';
@@ -1916,6 +1923,11 @@ function updatePlaying(dt) {
 
   if (ballistic) {
     rocket.angle -= rocket.angle * Math.min(1, activeStats.autoStabilizeRate * dt);
+  } else if (isMobile && tiltEnabled) {
+    rocket.angle += tiltInput * activeStats.rotationSpeed * TILT_SPEED_MULT * dt;
+    if (Math.abs(tiltInput) < 0.05) {
+      rocket.angle -= rocket.angle * Math.min(1, activeStats.autoStabilizeRate * dt);
+    }
   } else {
     if (keys.left) rocket.angle -= activeStats.rotationSpeed * dt;
     if (keys.right) rocket.angle += activeStats.rotationSpeed * dt;
@@ -3197,6 +3209,8 @@ function render() {
 
 async function enableTilt() {
   neutralGamma = null;
+  smoothGamma = null;
+  tiltInput = 0;
   if (typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
@@ -3211,14 +3225,27 @@ async function enableTilt() {
 }
 
 window.addEventListener('deviceorientation', (e) => {
-  if (!isMobile || !tiltEnabled || state !== 'playing' || ballistic) return;
+  if (!isMobile || !tiltEnabled || state !== 'playing' || ballistic) {
+    tiltInput = 0;
+    return;
+  }
   if (e.gamma == null) return;
-  if (neutralGamma === null) neutralGamma = e.gamma;
-  const delta = e.gamma - neutralGamma;
-  keys.left = false;
-  keys.right = false;
-  if (delta < -TILT_DEAD_ZONE) keys.left = true;
-  else if (delta > TILT_DEAD_ZONE) keys.right = true;
+
+  if (neutralGamma === null) {
+    neutralGamma = e.gamma;
+    smoothGamma = e.gamma;
+  }
+
+  smoothGamma += (e.gamma - smoothGamma) * TILT_SMOOTH;
+  const delta = smoothGamma - neutralGamma;
+  const abs = Math.abs(delta);
+
+  if (abs <= TILT_DEAD_ZONE) {
+    tiltInput = 0;
+  } else {
+    const t = Math.min(1, (abs - TILT_DEAD_ZONE) / (TILT_FULL_ANGLE - TILT_DEAD_ZONE));
+    tiltInput = Math.sign(delta) * (t * t);
+  }
 });
 
 window.addEventListener('keydown', (e) => {
@@ -3474,6 +3501,7 @@ window.__rl = {
   CONFIG, DIFFICULTIES, startGame, update, render, keys, audio,
   isMobile, enableTilt,
   get tiltEnabled() { return tiltEnabled; },
+  get tiltInput() { return tiltInput; },
   get neutralGamma() { return neutralGamma; },
   set neutralGamma(v) { neutralGamma = v; },
   get state() { return state; },
