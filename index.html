@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rocket Lemon</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #05060f;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    max-height: 100vh;
+    box-shadow: 0 0 60px rgba(80, 110, 255, 0.15);
+  }
+</style>
+</head>
+<body>
+<canvas id="game" width="480" height="720"></canvas>
+<script>
+'use strict';
+
+const W = 480;
+const H = 720;
+
+const CONFIG = {
+  gravity: 36,
+  thrust: 130,
+  rotationSpeed: 2.2,
+  autoStabilizeRate: 2,
+  drag: 0.12,
+  maxFallSpeed: 230,
+  fuelMax: 100,
+  fuelBurnPerSecond: 8,
+  refuelAmount: 60,
+  landingMaxVx: 55,
+  landingMaxVy: 80,
+  landingMaxAngle: 30 * Math.PI / 180,
+  segmentHeight: 950,
+  wallMargin: 14,
+  rocketHalfHeight: 15,
+  rocketRadius: 13,
+  padWidth: 84,
+  moonPadWidth: 150,
+};
+
+const DIFF_KEYS = ['easy', 'medium', 'hard'];
+const DIFFICULTIES = {
+  easy:   { label: 'EASY',   desc: '3 PADS - FEW SLOW OBSTACLES',   platforms: 3,  obstacleCount: [1, 2], obstacleSpeed: [30, 55] },
+  medium: { label: 'MEDIUM', desc: '8 PADS - MORE, FASTER',         platforms: 8,  obstacleCount: [2, 3], obstacleSpeed: [60, 100] },
+  hard:   { label: 'HARD',   desc: '12 PADS - SWARM, FASTEST',      platforms: 12, obstacleCount: [3, 5], obstacleSpeed: [95, 150] },
+};
+
+const OBSTACLE_TYPES = {
+  asteroid:  { radius: 12, bob: 0,  reason: 'HIT AN ASTEROID' },
+  satellite: { radius: 13, bob: 0,  reason: 'HIT A SATELLITE' },
+  junk:      { radius: 9,  bob: 25, reason: 'HIT SPACE JUNK' },
+  ray:       { radius: 10, bob: 0,  reason: 'ZAPPED BY A NOXIOUS RAY' },
+  dentist:   { radius: 12, bob: 30, reason: 'THE DENTIST GOT YOU' },
+  dog:       { radius: 12, bob: 35, reason: 'A SPACE DOG GOT YOU' },
+};
+const OBSTACLE_KEYS = Object.keys(OBSTACLE_TYPES);
+
+// ---------------------------------------------------------------- sprites
+
+function makeSprite(rows, palette) {
+  const h = rows.length;
+  const w = rows[0].length;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const g = canvas.getContext('2d');
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const color = palette[rows[y][x]];
+      if (color) {
+        g.fillStyle = color;
+        g.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+  return canvas;
+}
+
+const SPRITES = {
+  rocket: makeSprite([
+    '.....R.....',
+    '....RRR....',
+    '...RRRRR...',
+    '...WWWWW...',
+    '..WWWWWWW..',
+    '..WWGGGWW..',
+    '..WWGGGWW..',
+    '..WWWWWWW..',
+    '..RRRRRRR..',
+    '..SWWWWWS..',
+    '..SWWWWWS..',
+    '.RSWWWWWSR.',
+    '.RRSWWWSRR.',
+    'RRRSWWWSRRR',
+    'RR..NNN..RR',
+    '....NNN....',
+  ], { R: '#e63946', W: '#f4f6fb', S: '#c9d0dd', G: '#8fd8ff', N: '#3a3a44' }),
+  flame1: makeSprite([
+    '.OOO.',
+    'OOROO',
+    '.RRR.',
+    '..R..',
+  ], { O: '#ffb020', R: '#ff4020' }),
+  flame2: makeSprite([
+    '.OOO.',
+    '.ORO.',
+    '.RR..',
+    '..R..',
+  ], { O: '#ffb020', R: '#ff4020' }),
+  asteroid: makeSprite([
+    '...GGGGG....',
+    '..GGGGGGG...',
+    '.GGGDDGGGG..',
+    'GGGGDDGGGGG.',
+    'GGGGGGGGGDG.',
+    'GGDGGGGGGDG.',
+    'GGDDGGGGGGG.',
+    'GGGGGGDDGGG.',
+    '.GGGGGDDGG..',
+    '..GGGGGGG...',
+    '...GGGG.....',
+  ], { G: '#8d8d99', D: '#5c5c68' }),
+  satellite: makeSprite([
+    'PPP...AA...PPP',
+    'PPPAABBBBAAPPP',
+    'PPP..BWWB..PPP',
+    'PPP..BBBB..PPP',
+    '.....BBBB.....',
+    '......AA......',
+    '.....AAAA.....',
+  ], { P: '#3a6ff7', B: '#c9d2e0', W: '#7fd4e8', A: '#7d8698' }),
+  junk: makeSprite([
+    '.CCCCCC.',
+    'CCCCCCCC',
+    'CRRRRRRC',
+    'CCCCCCCC',
+    'CCCCCCCC',
+    'CRRRRRRC',
+    'CCCCCCCC',
+    '.CCCCCC.',
+  ], { C: '#b0b8c0', R: '#d04030' }),
+  ray: makeSprite([
+    '.....YY.',
+    '....YY..',
+    '...YYY..',
+    '...YY...',
+    '..YYYYY.',
+    '....YY..',
+    '...YY...',
+    '..YY....',
+    '.YYY....',
+    '.YY.....',
+    'YY......',
+    'Y.......',
+  ], { Y: '#ffe94a' }),
+  dentist: makeSprite([
+    '...HHHH.....',
+    '..HSSSSH....',
+    '..SSSSSS....',
+    '..SMMMMS....',
+    '...MMMM.....',
+    '..WWWWWW....',
+    '.WWWWWWW.AA.',
+    '.WWWWWWWAAAA',
+    '.WWWWWWW..AD',
+    '..WWWWWW....',
+    '..WW..WW....',
+    '..WW..WW....',
+    '..BB..BB....',
+  ], { H: '#4a3220', S: '#f0c8a0', M: '#7fd4e8', W: '#f4f4f8', A: '#9aa3b2', D: '#e8e8f0', B: '#2f2f38' }),
+  lemon: makeSprite([
+    '.....G...',
+    '..YYYG...',
+    '.YYYYYY..',
+    'YYYYYYYY.',
+    'YYYYYYYY.',
+    '.OYYYYO..',
+    '..OOOO...',
+  ], { Y: '#6abf4b', O: '#4e9636', G: '#2e7d32' }),
+  astronaut: makeSprite([
+    '..WWWW..',
+    '.WWWWWW.',
+    '.WVVVVW.',
+    '.WWWWWW.',
+    '..WWWW..',
+    '.WWWWWW.',
+    'WWWWWWWW',
+    'W.WWWW.W',
+    '..WWWW..',
+    '..W..W..',
+    '..W..W..',
+    '.GG..GG.',
+  ], { W: '#e8ecf4', V: '#20304d', G: '#8a93a5' }),
+  flag: makeSprite([
+    'GGGGGGGGGGGGG',
+    'GGGGGYYYGGGGG',
+    'GGGYYYYYYYGGG',
+    'GGYYYBBBYYYGG',
+    'GGGYYYYYYYGGG',
+    'GGGGGYYYGGGGG',
+    'GGGGGGGGGGGGG',
+  ], { G: '#009c3b', Y: '#ffdf00', B: '#002776' }),
+  dog: makeSprite([
+    '.DD..........',
+    '.DBB......BD.',
+    '.BBBBBBBBBBB.',
+    'PBWBBBBBBBBB.',
+    '.BBBBBBBBBBB.',
+    '..BB.BB.BB...',
+    '..BB.BB.BB...',
+  ], { B: '#a5692a', D: '#7c4a1d', P: '#ff7fa5', W: '#ffffff' }),
+};
+
+// ---------------------------------------------------------------- audio
+
+const audio = {
+  ctx: null,
+  master: null,
+  thrustGain: null,
+  muted: false,
+  musicStep: 0,
+  musicNextTime: 0,
+
+  init() {
+    if (this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.6;
+      this.master.connect(this.ctx.destination);
+
+      const seconds = 1;
+      const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * seconds, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      noise.loop = true;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 600;
+      this.thrustGain = this.ctx.createGain();
+      this.thrustGain.gain.value = 0;
+      noise.connect(filter);
+      filter.connect(this.thrustGain);
+      this.thrustGain.connect(this.master);
+      noise.start();
+
+      this.startMusic();
+    } catch (e) {
+      this.ctx = null;
+    }
+  },
+
+  toggleMute() {
+    this.muted = !this.muted;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.6;
+  },
+
+  setThrust(on) {
+    if (!this.ctx) return;
+    this.thrustGain.gain.setTargetAtTime(on ? 0.22 : 0, this.ctx.currentTime, 0.05);
+  },
+
+  note(midi, when, duration, type, volume) {
+    const osc = this.ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(volume, when);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + duration);
+    osc.connect(gain);
+    gain.connect(this.master);
+    osc.start(when);
+    osc.stop(when + duration + 0.02);
+  },
+
+  blip(midi, delay, duration, volume) {
+    if (!this.ctx) return;
+    this.note(midi, this.ctx.currentTime + delay, duration, 'square', volume);
+  },
+
+  sfxLanding() {
+    this.blip(72, 0, 0.1, 0.14);
+    this.blip(79, 0.09, 0.16, 0.14);
+  },
+
+  sfxPickup() {
+    this.blip(88, 0, 0.07, 0.13);
+    this.blip(95, 0.06, 0.12, 0.13);
+  },
+
+  sfxVictory() {
+    this.blip(72, 0, 0.12, 0.15);
+    this.blip(76, 0.12, 0.12, 0.15);
+    this.blip(79, 0.24, 0.12, 0.15);
+    this.blip(84, 0.36, 0.4, 0.16);
+  },
+
+  sfxExplosion() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const duration = 0.7;
+    const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * duration, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    }
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 900;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.5, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.master);
+    src.start(t);
+
+    const osc = this.ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.5);
+    const oscGain = this.ctx.createGain();
+    oscGain.gain.setValueAtTime(0.25, t);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(oscGain);
+    oscGain.connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.55);
+  },
+
+  startMusic() {
+    const LEAD = [76, 0, 79, 0, 83, 0, 79, 0, 76, 0, 79, 0, 84, 83, 79, 0,
+                  76, 0, 79, 0, 83, 0, 86, 0, 88, 0, 86, 83, 79, 0, 0, 0];
+    const BASS = [40, 43, 45, 43, 36, 40, 43, 47];
+    const stepDuration = 0.115;
+    this.musicNextTime = this.ctx.currentTime + 0.1;
+    setInterval(() => {
+      if (!this.ctx) return;
+      while (this.musicNextTime < this.ctx.currentTime + 0.2) {
+        const step = this.musicStep % 32;
+        const lead = LEAD[step];
+        if (lead) this.note(lead, this.musicNextTime, stepDuration * 0.9, 'square', 0.05);
+        if (step % 4 === 0) {
+          this.note(BASS[(step / 4) % 8], this.musicNextTime, stepDuration * 3.5, 'triangle', 0.09);
+        }
+        this.musicNextTime += stepDuration;
+        this.musicStep++;
+      }
+    }, 80);
+  },
+};
+
+// ---------------------------------------------------------------- state
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+let state = 'title'; // title | difficulty | playing | exploding | win | lose
+let menuIndex = 0;
+let currentDiff = 'easy';
+let attempts = 1;
+let time = 0;
+let camY = -60;
+let explodeTimer = 0;
+let crashReason = '';
+
+let platforms = [];
+let obstacles = [];
+let particles = [];
+let thrustParticles = [];
+let toasts = [];
+let targetIndex = 0;
+let worldTop = 0;
+let winTime = 0;
+let confetti = [];
+let lemonRain = [];
+
+const CONFETTI_COLORS = ['#ff4d5e', '#3ddc84', '#41a0ff', '#ffd166', '#ff7fd1', '#b085ff'];
+const MOON_RADIUS = 300;
+
+const rocket = { x: W / 2, y: CONFIG.rocketHalfHeight, vx: 0, vy: 0, angle: 0, fuel: CONFIG.fuelMax, landed: true };
+const keys = { left: false, right: false, up: false };
+
+const NEBULAE = [
+  { x: 90, y: 300, r: 190, color: '123,92,255' },
+  { x: 400, y: 90, r: 150, color: '46,230,214' },
+  { x: 250, y: 560, r: 220, color: '255,110,199' },
+  { x: 60, y: 660, r: 160, color: '64,120,255' },
+];
+
+const stars = [];
+for (let i = 0; i < 110; i++) {
+  stars.push({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    parallax: i < 60 ? 0.35 : 0.7,
+    size: i < 60 ? 1 : 2,
+    twinkle: Math.random() * Math.PI * 2,
+  });
+}
+
+function addToast(text) {
+  toasts.push({ text, t: 2 });
+}
+
+function generateWorld(diffKey) {
+  const diff = DIFFICULTIES[diffKey];
+  platforms = [];
+  for (let i = 0; i < diff.platforms; i++) {
+    const w = CONFIG.padWidth;
+    platforms.push({
+      x: 40 + Math.random() * (W - 80 - w),
+      y: (i + 1) * CONFIG.segmentHeight,
+      w,
+      isMoon: false,
+      lemonCollected: false,
+    });
+  }
+  platforms.push({
+    x: W / 2 - CONFIG.moonPadWidth / 2,
+    y: (diff.platforms + 1) * CONFIG.segmentHeight,
+    w: CONFIG.moonPadWidth,
+    isMoon: true,
+  });
+  worldTop = platforms[platforms.length - 1].y + 350;
+
+  obstacles = [];
+  const boundaries = [0, ...platforms.map(p => p.y)];
+  for (let s = 0; s < boundaries.length - 1; s++) {
+    const [minCount, maxCount] = diff.obstacleCount;
+    const count = minCount + Math.floor(Math.random() * (maxCount - minCount + 1));
+    for (let i = 0; i < count; i++) {
+      const type = OBSTACLE_KEYS[Math.floor(Math.random() * OBSTACLE_KEYS.length)];
+      const info = OBSTACLE_TYPES[type];
+      const [minSpeed, maxSpeed] = diff.obstacleSpeed;
+      obstacles.push({
+        type,
+        x: 30 + Math.random() * (W - 60),
+        y: boundaries[s] + 140 + Math.random() * (boundaries[s + 1] - boundaries[s] - 280),
+        dir: Math.random() < 0.5 ? -1 : 1,
+        speed: minSpeed + Math.random() * (maxSpeed - minSpeed),
+        bobAmp: info.bob,
+        bobPhase: Math.random() * Math.PI * 2,
+        radius: info.radius,
+      });
+    }
+  }
+}
+
+function startGame(diffKey, isRetry) {
+  currentDiff = diffKey;
+  attempts = isRetry ? attempts + 1 : 1;
+  generateWorld(diffKey);
+  rocket.x = W / 2;
+  rocket.y = CONFIG.rocketHalfHeight;
+  rocket.vx = 0;
+  rocket.vy = 0;
+  rocket.angle = 0;
+  rocket.fuel = CONFIG.fuelMax;
+  rocket.landed = true;
+  targetIndex = 0;
+  camY = -60;
+  particles = [];
+  thrustParticles = [];
+  toasts = [];
+  confetti = [];
+  lemonRain = [];
+  winTime = 0;
+  crashReason = '';
+  state = 'playing';
+  addToast('PRESS UP TO LAUNCH');
+}
+
+// ---------------------------------------------------------------- update
+
+function normalizeAngle(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+function landingOk() {
+  return Math.abs(rocket.vx) <= CONFIG.landingMaxVx &&
+         Math.abs(rocket.vy) <= CONFIG.landingMaxVy &&
+         Math.abs(normalizeAngle(rocket.angle)) <= CONFIG.landingMaxAngle;
+}
+
+function land(platform) {
+  rocket.landed = true;
+  rocket.y = (platform ? platform.y : 0) + CONFIG.rocketHalfHeight;
+  rocket.vx = 0;
+  rocket.vy = 0;
+  rocket.angle = 0;
+  audio.setThrust(false);
+  if (!platform) {
+    addToast('BACK ON EARTH');
+    audio.sfxLanding();
+    return;
+  }
+  if (platform.isMoon) {
+    state = 'win';
+    winTime = 0;
+    confetti = [];
+    lemonRain = [];
+    audio.sfxVictory();
+    return;
+  }
+  audio.sfxLanding();
+}
+
+function collectLemon(platform) {
+  platform.lemonCollected = true;
+  targetIndex++;
+  rocket.fuel = Math.min(CONFIG.fuelMax, rocket.fuel + CONFIG.refuelAmount);
+  addToast('+' + CONFIG.refuelAmount + ' FUEL');
+  audio.sfxPickup();
+  const center = platform.x + platform.w / 2;
+  for (let i = 0; i < 14; i++) {
+    particles.push({
+      x: center,
+      y: platform.y + 24,
+      vx: (Math.random() * 2 - 1) * 120,
+      vy: (Math.random() * 2 - 1) * 120,
+      life: 0.4 + Math.random() * 0.3,
+      color: Math.random() < 0.5 ? '#6abf4b' : '#ffffff',
+    });
+  }
+}
+
+function crash(reason) {
+  crashReason = (rocket.fuel <= 0 && reason === 'BAD LANDING') ? 'OUT OF FUEL' : reason;
+  state = 'exploding';
+  explodeTimer = 1.3;
+  audio.setThrust(false);
+  audio.sfxExplosion();
+  const colors = ['#f7dd2f', '#ffb020', '#ff4020', '#ffffff'];
+  for (let i = 0; i < 46; i++) {
+    particles.push({
+      x: rocket.x,
+      y: rocket.y,
+      vx: (Math.random() * 2 - 1) * 170,
+      vy: (Math.random() * 2 - 1) * 170 + 50,
+      life: 0.6 + Math.random() * 0.7,
+      color: colors[Math.floor(Math.random() * colors.length)],
+    });
+  }
+}
+
+function spawnThrustParticles() {
+  const nozzleX = rocket.x - Math.sin(rocket.angle) * 18;
+  const nozzleY = rocket.y - Math.cos(rocket.angle) * 18;
+  const colors = ['#ffd166', '#ff7b3a', '#ffffff'];
+  for (let i = 0; i < 2; i++) {
+    thrustParticles.push({
+      x: nozzleX,
+      y: nozzleY,
+      vx: rocket.vx - Math.sin(rocket.angle) * 90 + (Math.random() * 2 - 1) * 30,
+      vy: rocket.vy - Math.cos(rocket.angle) * 90 + (Math.random() * 2 - 1) * 30,
+      life: 0.3 + Math.random() * 0.2,
+      color: colors[Math.floor(Math.random() * 3)],
+    });
+  }
+}
+
+function updateThrustParticles(dt) {
+  for (const p of thrustParticles) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+  }
+  thrustParticles = thrustParticles.filter(p => p.life > 0);
+}
+
+function updateObstacles(dt) {
+  for (const o of obstacles) {
+    o.x += o.dir * o.speed * dt;
+    if (o.dir > 0 && o.x > W + 40) o.x = -40;
+    if (o.dir < 0 && o.x < -40) o.x = W + 40;
+  }
+}
+
+function obstacleY(o) {
+  return o.y + (o.bobAmp ? Math.sin(time * 1.6 + o.bobPhase) * o.bobAmp : 0);
+}
+
+function updatePlaying(dt) {
+  updateObstacles(dt);
+
+  if (rocket.landed) {
+    audio.setThrust(false);
+    if (keys.up && rocket.fuel > 0) {
+      rocket.landed = false;
+      rocket.vy = 10;
+    } else {
+      return;
+    }
+  }
+
+  if (keys.left) rocket.angle -= CONFIG.rotationSpeed * dt;
+  if (keys.right) rocket.angle += CONFIG.rotationSpeed * dt;
+  if (!keys.left && !keys.right) {
+    rocket.angle -= rocket.angle * Math.min(1, CONFIG.autoStabilizeRate * dt);
+  }
+  rocket.angle = normalizeAngle(rocket.angle);
+
+  const thrusting = keys.up && rocket.fuel > 0;
+  if (thrusting) {
+    rocket.vx += Math.sin(rocket.angle) * CONFIG.thrust * dt;
+    rocket.vy += Math.cos(rocket.angle) * CONFIG.thrust * dt;
+    rocket.fuel = Math.max(0, rocket.fuel - CONFIG.fuelBurnPerSecond * dt);
+    spawnThrustParticles();
+  }
+  audio.setThrust(thrusting);
+  rocket.vy -= CONFIG.gravity * dt;
+  rocket.vx -= rocket.vx * CONFIG.drag * dt;
+  rocket.vy -= rocket.vy * CONFIG.drag * dt;
+  if (rocket.vy < -CONFIG.maxFallSpeed) rocket.vy = -CONFIG.maxFallSpeed;
+
+  const prevBottom = rocket.y - CONFIG.rocketHalfHeight;
+  rocket.x += rocket.vx * dt;
+  rocket.y += rocket.vy * dt;
+
+  if (rocket.x < CONFIG.wallMargin) { rocket.x = CONFIG.wallMargin; rocket.vx = Math.max(0, rocket.vx); }
+  if (rocket.x > W - CONFIG.wallMargin) { rocket.x = W - CONFIG.wallMargin; rocket.vx = Math.min(0, rocket.vx); }
+  if (rocket.y > worldTop) { rocket.y = worldTop; rocket.vy = Math.min(0, rocket.vy); }
+
+  const newBottom = rocket.y - CONFIG.rocketHalfHeight;
+
+  const targetPlatform = platforms[targetIndex];
+  if (!targetPlatform.isMoon && !targetPlatform.lemonCollected) {
+    const lemonX = targetPlatform.x + targetPlatform.w / 2;
+    const lemonY = targetPlatform.y + 24;
+    const dx = rocket.x - lemonX;
+    const dy = rocket.y - lemonY;
+    const reach = CONFIG.rocketRadius + 20;
+    if (dx * dx + dy * dy < reach * reach) collectLemon(targetPlatform);
+  }
+
+  for (let i = 0; i < platforms.length; i++) {
+    if (i > targetIndex) continue; // locked platforms are intangible
+    const p = platforms[i];
+    const centerOverPad = Math.abs(rocket.x - (p.x + p.w / 2)) <= p.w / 2;
+    if (rocket.vy <= 0 && prevBottom >= p.y - 2 && newBottom <= p.y && centerOverPad) {
+      if (landingOk()) land(p);
+      else crash('BAD LANDING');
+      return;
+    }
+    const boxOverlap = rocket.x + 8 > p.x && rocket.x - 8 < p.x + p.w &&
+                       rocket.y - CONFIG.rocketHalfHeight < p.y && rocket.y + CONFIG.rocketHalfHeight > p.y - 12;
+    if (boxOverlap) {
+      crash('BAD LANDING');
+      return;
+    }
+  }
+
+  if (newBottom <= 0) {
+    if (landingOk()) land(null);
+    else crash('BAD LANDING');
+    return;
+  }
+
+  for (const o of obstacles) {
+    const dx = rocket.x - o.x;
+    const dy = rocket.y - obstacleY(o);
+    const minDist = CONFIG.rocketRadius + o.radius;
+    if (dx * dx + dy * dy < minDist * minDist) {
+      crash(OBSTACLE_TYPES[o.type].reason);
+      return;
+    }
+  }
+}
+
+function moonSurfaceAt(x) {
+  const moonPad = platforms[platforms.length - 1];
+  const dx = x - W / 2;
+  if (Math.abs(dx) >= MOON_RADIUS) return -Infinity;
+  return moonPad.y - (MOON_RADIUS - Math.sqrt(MOON_RADIUS * MOON_RADIUS - dx * dx));
+}
+
+function updateCelebration(dt) {
+  if (winTime < 5) {
+    for (let i = 0; i < 2; i++) {
+      confetti.push({
+        x: Math.random() * W,
+        y: camY + H + 10,
+        vx: (Math.random() * 2 - 1) * 40,
+        vy: -(60 + Math.random() * 60),
+        phase: Math.random() * Math.PI * 2,
+        color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      });
+    }
+    if (Math.random() < 0.08 && lemonRain.length < 40) {
+      lemonRain.push({
+        x: 20 + Math.random() * (W - 40),
+        y: camY + H + 20,
+        vy: -(80 + Math.random() * 60),
+        spin: (Math.random() * 2 - 1) * 4,
+        angle: Math.random() * Math.PI * 2,
+        rest: false,
+      });
+    }
+  }
+  for (const c of confetti) {
+    c.x += (c.vx + Math.sin(time * 3 + c.phase) * 30) * dt;
+    c.y += c.vy * dt;
+  }
+  confetti = confetti.filter(c => c.y > moonSurfaceAt(c.x) && c.y > camY - 40);
+  for (const l of lemonRain) {
+    if (l.rest) continue;
+    l.y += l.vy * dt;
+    l.angle += l.spin * dt;
+    const surface = moonSurfaceAt(l.x);
+    if (l.y <= surface + 6) {
+      l.y = surface + 6;
+      l.rest = true;
+    }
+  }
+  lemonRain = lemonRain.filter(l => l.rest || l.y > camY - 40);
+}
+
+function updateParticles(dt) {
+  for (const p of particles) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy -= 120 * dt;
+    p.life -= dt;
+  }
+  particles = particles.filter(p => p.life > 0);
+}
+
+function update(dt) {
+  time += dt;
+  for (const t of toasts) t.t -= dt;
+  toasts = toasts.filter(t => t.t > 0);
+  updateThrustParticles(dt);
+
+  if (state === 'playing') {
+    updatePlaying(dt);
+  } else if (state === 'exploding') {
+    updateObstacles(dt);
+    updateParticles(dt);
+    explodeTimer -= dt;
+    if (explodeTimer <= 0) state = 'lose';
+  } else if (state === 'win') {
+    winTime += dt;
+    updateObstacles(dt);
+    updateParticles(dt);
+    updateCelebration(dt);
+  } else if (state === 'lose') {
+    updateObstacles(dt);
+    updateParticles(dt);
+  }
+
+  if (state === 'playing' || state === 'exploding' || state === 'win' || state === 'lose') {
+    const targetCam = Math.max(-60, Math.min(rocket.y - H * 0.45, worldTop - H + 40));
+    camY += (targetCam - camY) * Math.min(1, dt * 5);
+  }
+}
+
+// ---------------------------------------------------------------- render
+
+function sy(worldY) {
+  return H - (worldY - camY);
+}
+
+function lerpColor(c1, c2, t) {
+  const a = parseInt(c1.slice(1), 16);
+  const b = parseInt(c2.slice(1), 16);
+  const r = Math.round(((a >> 16) & 255) + (((b >> 16) & 255) - ((a >> 16) & 255)) * t);
+  const g = Math.round(((a >> 8) & 255) + (((b >> 8) & 255) - ((a >> 8) & 255)) * t);
+  const bl = Math.round((a & 255) + ((b & 255) - (a & 255)) * t);
+  return 'rgb(' + r + ',' + g + ',' + bl + ')';
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawVignette() {
+  const gradient = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.75);
+  gradient.addColorStop(0, 'rgba(0,0,0,0)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0.38)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawSpriteCentered(sprite, x, y, scale, alpha) {
+  if (alpha !== undefined) ctx.globalAlpha = alpha;
+  ctx.drawImage(sprite, x - sprite.width * scale / 2, y - sprite.height * scale / 2, sprite.width * scale, sprite.height * scale);
+  ctx.globalAlpha = 1;
+}
+
+function drawBackground(camPos) {
+  const progress = Math.max(0, Math.min(1, camPos / Math.max(1, worldTop - H)));
+  const top = lerpColor('#0d1330', '#04030c', progress);
+  const bottom = lerpColor('#1a2450', '#0a0c22', progress);
+  const gradient = ctx.createLinearGradient(0, 0, 0, H);
+  gradient.addColorStop(0, top);
+  gradient.addColorStop(1, bottom);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, W, H);
+
+  for (const n of NEBULAE) {
+    const span = H + 400;
+    const yy = (((n.y - camPos * 0.15) % span) + span) % span - 200;
+    const glow = ctx.createRadialGradient(n.x, yy, 0, n.x, yy, n.r);
+    glow.addColorStop(0, 'rgba(' + n.color + ',0.10)');
+    glow.addColorStop(1, 'rgba(' + n.color + ',0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(n.x - n.r, yy - n.r, n.r * 2, n.r * 2);
+  }
+
+  for (const s of stars) {
+    const yy = (((s.y - camPos * s.parallax) % H) + H) % H;
+    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(time * 2 + s.twinkle);
+    ctx.fillStyle = '#cfe3ff';
+    ctx.fillRect(s.x, yy, s.size, s.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawGround() {
+  const groundY = sy(0);
+  if (groundY > H + 60) return;
+  ctx.fillStyle = '#2c4a28';
+  ctx.fillRect(0, groundY, W, Math.max(0, H - groundY) + 60);
+  ctx.fillStyle = '#1e3319';
+  ctx.fillRect(0, groundY + 14, W, Math.max(0, H - groundY) + 60);
+  ctx.fillStyle = '#ffd166';
+  for (let i = 0; i < 14; i++) {
+    const lx = (i * 137 + 40) % W;
+    if (Math.abs(lx - W / 2) > 60) ctx.fillRect(lx, groundY + 22 + (i % 3) * 9, 2, 2);
+  }
+  // launch pad
+  ctx.fillStyle = '#242c40';
+  ctx.fillRect(W / 2 - 40, groundY - 2, 80, 8);
+  ctx.shadowColor = '#41e0d0';
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = '#41e0d0';
+  ctx.fillRect(W / 2 - 40, groundY - 4, 80, 3);
+  ctx.shadowBlur = 0;
+}
+
+function drawMoon() {
+  const moonPad = platforms[platforms.length - 1];
+  if (!moonPad) return;
+  const surfaceY = sy(moonPad.y);
+  if (surfaceY < -420) return;
+  const radius = 300;
+  const cx = W / 2;
+  const cy = surfaceY + radius;
+  ctx.shadowColor = '#aebbdd';
+  ctx.shadowBlur = 46;
+  ctx.fillStyle = '#cfd3d9';
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#aab0ba';
+  const craters = [[-160, 60, 26], [-60, 130, 38], [90, 80, 22], [170, 160, 30], [10, 40, 12]];
+  for (const [dx, dy, r] of craters) {
+    ctx.beginPath();
+    ctx.arc(cx + dx, cy + dy - radius + 90, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // landing zone markers
+  const blink = Math.floor(time * 3) % 2 === 0;
+  ctx.fillStyle = blink ? '#ffe94a' : '#c9a616';
+  ctx.fillRect(moonPad.x, surfaceY - 3, 6, 3);
+  ctx.fillRect(moonPad.x + moonPad.w - 6, surfaceY - 3, 6, 3);
+}
+
+function drawLemons() {
+  for (let i = 0; i < platforms.length - 1; i++) {
+    const p = platforms[i];
+    if (p.lemonCollected) continue;
+    const y = sy(p.y + 24) + Math.sin(time * 2.5 + i) * 4;
+    if (y < -30 || y > H + 30) continue;
+    const x = p.x + p.w / 2;
+    const active = i === targetIndex;
+    ctx.globalAlpha = active ? 1 : 0.25;
+    if (active) {
+      ctx.shadowColor = '#6abf4b';
+      ctx.shadowBlur = 14;
+    }
+    ctx.drawImage(SPRITES.lemon, x - 9, y - 7, 18, 14);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawCelebration() {
+  for (const c of confetti) {
+    ctx.fillStyle = c.color;
+    ctx.fillRect(c.x - 2, sy(c.y) - 2, 4, 4);
+  }
+  for (const l of lemonRain) {
+    ctx.save();
+    ctx.translate(l.x, sy(l.y));
+    ctx.rotate(l.angle);
+    ctx.drawImage(SPRITES.lemon, -7, -6, 14, 11);
+    ctx.restore();
+  }
+}
+
+function drawWinScene() {
+  const moonPad = platforms[platforms.length - 1];
+  const surfaceY = sy(moonPad.y);
+  const dir = rocket.x < W - 110 ? 1 : -1;
+  if (winTime < 0.6) return;
+  const startX = rocket.x + 16 * dir;
+  const endX = rocket.x + 56 * dir;
+  const walkT = Math.max(0, Math.min(1, (winTime - 0.6) / 1.4));
+  const ax = startX + (endX - startX) * walkT;
+  const bob = walkT < 1 ? Math.abs(Math.sin(winTime * 10)) * 2 : 0;
+  ctx.drawImage(SPRITES.astronaut, ax - 8, surfaceY - 24 - bob, 16, 24);
+  if (winTime > 2.2) {
+    const poleHeight = Math.min(1, (winTime - 2.2) / 0.5) * 32;
+    const poleX = ax + 16 * dir;
+    ctx.fillStyle = '#e8ecf4';
+    ctx.fillRect(poleX, surfaceY - poleHeight, 2, poleHeight);
+    if (poleHeight >= 32) {
+      const flagX = dir > 0 ? poleX + 2 : poleX - 26;
+      ctx.drawImage(SPRITES.flag, flagX, surfaceY - 32, 26, 14);
+    }
+  }
+}
+
+function drawPlatform(p, index) {
+  const y = sy(p.y);
+  if (y < -40 || y > H + 40) return;
+  const tangible = index <= targetIndex;
+  const isTarget = index === targetIndex;
+  ctx.globalAlpha = tangible ? 1 : 0.2;
+  ctx.fillStyle = '#242c40';
+  ctx.fillRect(p.x, y + 2, p.w, 8);
+  ctx.fillStyle = '#161c2c';
+  ctx.fillRect(p.x + 6, y + 10, 4, 9);
+  ctx.fillRect(p.x + p.w - 10, y + 10, 4, 9);
+  const pulse = 0.6 + 0.4 * Math.sin(time * 5);
+  const edgeColor = isTarget ? '#ffd166' : '#41e0d0';
+  ctx.shadowColor = edgeColor;
+  ctx.shadowBlur = isTarget ? 14 * pulse : 6;
+  ctx.fillStyle = edgeColor;
+  ctx.fillRect(p.x, y, p.w, 3);
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+}
+
+function drawObstacles() {
+  for (const o of obstacles) {
+    const y = sy(obstacleY(o));
+    if (y < -40 || y > H + 40) continue;
+    const sprite = SPRITES[o.type];
+    let alpha = 1;
+    if (o.type === 'ray') alpha = 0.55 + 0.45 * Math.sin(time * 18 + o.bobPhase);
+    drawSpriteCentered(sprite, o.x, y, 2, alpha);
+  }
+}
+
+function drawRocket() {
+  const x = rocket.x;
+  const y = sy(rocket.y);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rocket.angle);
+  ctx.drawImage(SPRITES.rocket, -11, -16, 22, 32);
+  if (state === 'playing' && !rocket.landed && keys.up && rocket.fuel > 0) {
+    const flame = Math.floor(time * 14) % 2 === 0 ? SPRITES.flame1 : SPRITES.flame2;
+    ctx.drawImage(flame, -5, 15, 10, 8);
+  }
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (const p of thrustParticles) {
+    ctx.globalAlpha = Math.min(1, p.life * 3);
+    ctx.fillStyle = p.color;
+    const size = 1 + p.life * 5;
+    ctx.fillRect(p.x - size / 2, sy(p.y) - size / 2, size, size);
+  }
+  for (const p of particles) {
+    ctx.globalAlpha = Math.min(1, p.life * 1.6);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - 2, sy(p.y) - 2, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function speedColor(value, limit) {
+  return Math.abs(value) <= limit ? '#57c74f' : '#ff5050';
+}
+
+function drawHUD() {
+  ctx.fillStyle = 'rgba(8,12,26,0.62)';
+  roundRect(8, 8, W - 16, 62, 8);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,160,255,0.18)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 10px monospace';
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText('FUEL', 20, 26);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  roundRect(20, 32, 150, 8, 4);
+  ctx.fill();
+  const ratio = rocket.fuel / CONFIG.fuelMax;
+  const low = rocket.fuel <= 20;
+  const barColor = rocket.fuel > 40 ? '#3ddc84' : (low ? '#ff4d5e' : '#ffb020');
+  if (!low || Math.floor(time * 5) % 2 === 0) {
+    ctx.shadowColor = barColor;
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = barColor;
+    roundRect(20, 32, Math.max(6, 150 * ratio), 8, 4);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // target distance + velocity
+  const target = platforms[targetIndex];
+  const distance = Math.max(0, Math.round((target.y - rocket.y) / 10));
+  ctx.font = 'bold 11px monospace';
+  ctx.fillStyle = '#cfe3ff';
+  ctx.fillText((target.isMoon ? 'MOON ' : 'NEXT LEMON ') + distance + 'm', 20, 58);
+  ctx.fillStyle = speedColor(rocket.vx, CONFIG.landingMaxVx);
+  ctx.fillText('VX ' + (Math.abs(rocket.vx) / 10).toFixed(1), 160, 58);
+  ctx.fillStyle = speedColor(rocket.vy, CONFIG.landingMaxVy);
+  ctx.fillText('VY ' + (Math.abs(rocket.vy) / 10).toFixed(1), 225, 58);
+
+  // progress + attempts
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#cfe3ff';
+  const total = platforms.length - 1;
+  ctx.fillText(target.isMoon ? 'TARGET: MOON' : 'PAD ' + (targetIndex + 1) + '/' + total, W - 20, 26);
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText('ATTEMPT ' + attempts, W - 20, 42);
+  ctx.fillText(DIFFICULTIES[currentDiff].label, W - 20, 58);
+
+  // offscreen target arrow
+  const targetScreenY = sy(target.y);
+  if (targetScreenY < 30 && state === 'playing') {
+    const ax = Math.max(20, Math.min(W - 20, target.x + target.w / 2));
+    ctx.shadowColor = '#ffd166';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath();
+    ctx.moveTo(ax - 8, 92);
+    ctx.lineTo(ax + 8, 92);
+    ctx.lineTo(ax, 80);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'center';
+    ctx.fillText(distance + 'm', ax, 108);
+  }
+  ctx.textAlign = 'left';
+}
+
+function drawToasts() {
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  let y = 180;
+  for (const t of toasts) {
+    ctx.globalAlpha = Math.min(1, t.t);
+    ctx.fillStyle = '#ffd166';
+    ctx.fillText(t.text, W / 2, y);
+    y += 22;
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+}
+
+function drawCenteredText(lines) {
+  ctx.textAlign = 'center';
+  for (const [text, y, size, color, glow] of lines) {
+    ctx.font = 'bold ' + size + 'px monospace';
+    ctx.fillStyle = color;
+    if (glow) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 18;
+    }
+    ctx.fillText(text, W / 2, y);
+    ctx.shadowBlur = 0;
+  }
+  ctx.textAlign = 'left';
+}
+
+function renderTitle() {
+  drawBackground(time * 12);
+  drawCenteredText([
+    ['ROCKET', 160, 52, '#f4f6fb', true],
+    ['LEMON', 220, 52, '#ffd166', true],
+    ['LAUNCH TO THE MOON', 258, 14, '#cfe3ff'],
+  ]);
+  ctx.save();
+  ctx.translate(W / 2, 400);
+  ctx.drawImage(SPRITES.rocket, -33, -48, 66, 96);
+  const flame = Math.floor(time * 10) % 2 === 0 ? SPRITES.flame1 : SPRITES.flame2;
+  ctx.drawImage(flame, -15, 46, 30, 24);
+  ctx.restore();
+  if (Math.floor(time * 2) % 2 === 0) {
+    drawCenteredText([['PRESS ENTER TO START', 560, 16, '#ffffff', true]]);
+  }
+  drawCenteredText([
+    ['LEFT/RIGHT ROTATE - UP THRUST - M MUTE', 640, 11, '#8892a6'],
+    ['GRAB EVERY LEMON. LAND GENTLY ON THE MOON.', 662, 11, '#8892a6'],
+  ]);
+  drawVignette();
+}
+
+function renderMenu() {
+  drawBackground(time * 12);
+  drawCenteredText([['SELECT DIFFICULTY', 150, 24, '#ffd166', true]]);
+  DIFF_KEYS.forEach((key, i) => {
+    const diff = DIFFICULTIES[key];
+    const y = 260 + i * 90;
+    const selected = i === menuIndex;
+    if (selected) {
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      roundRect(90, y - 26, W - 180, 66, 10);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,209,102,0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    drawCenteredText([
+      [diff.label, y, 24, selected ? '#ffffff' : '#8892a6', selected],
+      [diff.desc, y + 24, 11, selected ? '#cfe3ff' : '#5a6478'],
+    ]);
+  });
+  drawCenteredText([['UP/DOWN SELECT - ENTER LAUNCH - ESC BACK', 620, 11, '#8892a6']]);
+  drawVignette();
+}
+
+function renderWorld() {
+  drawBackground(camY);
+  drawMoon();
+  drawGround();
+  platforms.forEach((p, i) => { if (!p.isMoon) drawPlatform(p, i); });
+  drawLemons();
+  drawObstacles();
+  if (state !== 'exploding' && state !== 'lose') drawRocket();
+  if (state === 'win') {
+    drawWinScene();
+    drawCelebration();
+  }
+  drawParticles();
+  drawVignette();
+  drawHUD();
+  drawToasts();
+
+  if (state === 'win' && winTime > 3.2) {
+    ctx.fillStyle = 'rgba(10,14,30,0.82)';
+    roundRect(60, 96, W - 120, 196, 12);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,209,102,0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    drawCenteredText([
+      ['YOU REACHED', 148, 30, '#ffd166', true],
+      ['THE MOON!', 186, 30, '#ffd166', true],
+      ['ATTEMPTS: ' + attempts, 228, 14, '#cfe3ff'],
+      ['R RETRY - ENTER MENU', 264, 13, '#ffffff'],
+    ]);
+  } else if (state === 'lose') {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(10,14,30,0.85)';
+    roundRect(60, 240, W - 120, 230, 12);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(120,160,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    drawCenteredText([
+      ['CRASHED!', 305, 36, '#ff4d5e', true],
+      [crashReason, 345, 14, '#cfe3ff'],
+      ['ATTEMPT ' + attempts, 385, 13, '#8fa3c8'],
+      ['R RETRY - ENTER MENU', 440, 13, '#ffffff'],
+    ]);
+  }
+}
+
+function render() {
+  if (state === 'title') renderTitle();
+  else if (state === 'difficulty') renderMenu();
+  else renderWorld();
+}
+
+// ---------------------------------------------------------------- input
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault();
+  audio.init();
+  if (e.key === 'm' || e.key === 'M') { audio.toggleMute(); return; }
+
+  if (state === 'title') {
+    if (e.key === 'Enter' || e.key === ' ') { state = 'difficulty'; menuIndex = 0; }
+  } else if (state === 'difficulty') {
+    if (e.key === 'ArrowUp' && !e.repeat) menuIndex = (menuIndex + 2) % 3;
+    else if (e.key === 'ArrowDown' && !e.repeat) menuIndex = (menuIndex + 1) % 3;
+    else if (e.key === '1') menuIndex = 0;
+    else if (e.key === '2') menuIndex = 1;
+    else if (e.key === '3') menuIndex = 2;
+    else if (e.key === 'Enter' || e.key === ' ') startGame(DIFF_KEYS[menuIndex], false);
+    else if (e.key === 'Escape') state = 'title';
+  } else if (state === 'win' || state === 'lose') {
+    if (e.key === 'r' || e.key === 'R') startGame(currentDiff, true);
+    else if (e.key === 'Enter' || e.key === 'Escape') state = 'title';
+  }
+
+  if (e.key === 'ArrowLeft') keys.left = true;
+  if (e.key === 'ArrowRight') keys.right = true;
+  if (e.key === 'ArrowUp') keys.up = true;
+});
+
+window.addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft') keys.left = false;
+  if (e.key === 'ArrowRight') keys.right = false;
+  if (e.key === 'ArrowUp') keys.up = false;
+});
+
+// ---------------------------------------------------------------- main loop
+
+let lastTime = 0;
+function frame(t) {
+  const dt = Math.min((t - lastTime) / 1000, 1 / 30);
+  lastTime = t;
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// debug/test hooks
+window.__rl = {
+  CONFIG, DIFFICULTIES, startGame, update, render, keys, audio,
+  get state() { return state; },
+  set state(v) { state = v; },
+  get rocket() { return rocket; },
+  get platforms() { return platforms; },
+  get obstacles() { return obstacles; },
+  get targetIndex() { return targetIndex; },
+  set targetIndex(v) { targetIndex = v; },
+  get crashReason() { return crashReason; },
+  get attempts() { return attempts; },
+  get winTime() { return winTime; },
+  get confetti() { return confetti; },
+  get lemonRain() { return lemonRain; },
+};
+</script>
+</body>
+</html>
