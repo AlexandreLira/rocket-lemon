@@ -440,6 +440,32 @@ let time = 0;
 let camY = -60;
 let explodeTimer = 0;
 let crashReason = '';
+let deathQuote = '';
+let deathQuoteBag = [];
+
+const DEATH_QUOTES = [
+  'Missão fracassada. A Lua agradece por manter distância.',
+  'Você morreu. Tecnicamente, foi uma aterrissagem… só que horizontal.',
+  'Combustível acabou. Planejamento espacial nota 7… de 100.',
+  'A NASA pediu para avisar que não te conhece.',
+  'Parabéns! Você descobriu um novo jeito de não chegar à Lua.',
+  'Desviar de obstáculos era opcional só na sua cabeça.',
+  'Sua nave virou sucata premium.',
+  'Se a intenção era virar meteoro, sucesso absoluto.',
+  'Game Over. Talvez pilotar no teclado não seja seu dom.',
+  'A gravidade venceu novamente. Que plot twist.',
+];
+
+function pickDeathQuote() {
+  if (deathQuoteBag.length === 0) {
+    deathQuoteBag = DEATH_QUOTES.map((_, i) => i);
+    for (let i = deathQuoteBag.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deathQuoteBag[i], deathQuoteBag[j]] = [deathQuoteBag[j], deathQuoteBag[i]];
+    }
+  }
+  deathQuote = DEATH_QUOTES[deathQuoteBag.pop()];
+}
 
 let platforms = [];
 let obstacles = [];
@@ -544,6 +570,7 @@ function getActiveStats() {
 
 function startGame(diffKey, isRetry) {
   currentDiff = diffKey;
+  if (!isRetry) deathQuoteBag = [];
   attempts = isRetry ? attempts + 1 : 1;
   generateWorld(diffKey);
   const activeStats = getActiveStats();
@@ -565,6 +592,7 @@ function startGame(diffKey, isRetry) {
   ballistic = false;
   dragging = false;
   crashReason = '';
+  deathQuote = '';
   state = 'playing';
   addToast(CHARACTERS[currentCharacter].startToast);
   addToast('PRESS UP TO LAUNCH');
@@ -664,6 +692,7 @@ function collectLemon(platform) {
 }
 
 function crash(reason) {
+  if (state === 'exploding' || state === 'lose') return;
   crashReason = (rocket.fuel <= 0 && reason === 'BAD LANDING') ? 'OUT OF FUEL' : reason;
   ballistic = false;
   state = 'exploding';
@@ -909,7 +938,10 @@ function update(dt) {
     updateObstacles(dt);
     updateParticles(dt);
     explodeTimer -= dt;
-    if (explodeTimer <= 0) state = 'lose';
+    if (explodeTimer <= 0) {
+      pickDeathQuote();
+      state = 'lose';
+    }
   } else if (state === 'win') {
     winTime += dt;
     updateObstacles(dt);
@@ -1501,6 +1533,20 @@ function drawWrappedText(text, x, y, maxWidth, font, color, lineHeight, maxLines
   return lines.length;
 }
 
+function drawCenteredWrappedText(text, y, maxWidth, font, color, lineHeight, maxLines) {
+  let lines = wrapTextLines(text, maxWidth, font);
+  if (maxLines && lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    lines[maxLines - 1] = truncateText(lines[maxLines - 1], maxWidth, font);
+  }
+  ctx.font = font;
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  lines.forEach((line, i) => ctx.fillText(line, W / 2, y + i * lineHeight));
+  ctx.textAlign = 'left';
+  return lines.length;
+}
+
 function renderTitle() {
   drawBackground(time * 12);
   drawCenteredText([
@@ -1634,16 +1680,24 @@ function renderWorld() {
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = 'rgba(10,14,30,0.85)';
-    roundRect(60, 240, W - 120, 230, 12);
+    roundRect(60, 240, W - 120, 290, 12);
     ctx.fill();
     ctx.strokeStyle = 'rgba(120,160,255,0.25)';
     ctx.lineWidth = 1;
     ctx.stroke();
     drawCenteredText([
-      ['CRASHED!', 305, 36, '#ff4d5e', true],
-      [crashReason, 345, 14, '#cfe3ff'],
-      ['ATTEMPT ' + attempts, 385, 13, '#8fa3c8'],
-      ['R RETRY - ENTER MENU', 440, 13, '#ffffff'],
+      ['CRASHED!', 280, 36, '#ff4d5e', true],
+    ]);
+    const quoteY = 320;
+    const quoteFont = 'bold 12px monospace';
+    const quoteLines = drawCenteredWrappedText(
+      deathQuote, quoteY, 320, quoteFont, '#cfe3ff', 15
+    );
+    const reasonY = quoteY + quoteLines * 15 + 12;
+    drawCenteredText([
+      [crashReason, reasonY, 11, '#8fa3c8'],
+      ['ATTEMPT ' + attempts, reasonY + 26, 13, '#8fa3c8'],
+      ['R RETRY - ENTER MENU', reasonY + 58, 13, '#ffffff'],
     ]);
   }
 }
@@ -1763,6 +1817,7 @@ window.__rl = {
   get targetIndex() { return targetIndex; },
   set targetIndex(v) { targetIndex = v; },
   get crashReason() { return crashReason; },
+  get deathQuote() { return deathQuote; },
   get attempts() { return attempts; },
   get winTime() { return winTime; },
   get confetti() { return confetti; },
