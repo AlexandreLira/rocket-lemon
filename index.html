@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <title>Rocket Lemon</title>
@@ -56,9 +56,9 @@ const CONFIG = {
 
 const DIFF_KEYS = ['easy', 'medium', 'hard'];
 const DIFFICULTIES = {
-  easy:   { label: 'EASY',   desc: '3 PADS - FEW SLOW OBSTACLES',   platforms: 3,  obstacleCount: [1, 2], obstacleSpeed: [30, 55] },
-  medium: { label: 'MEDIUM', desc: '8 PADS - MORE, FASTER',         platforms: 8,  obstacleCount: [2, 3], obstacleSpeed: [60, 100] },
-  hard:   { label: 'HARD',   desc: '12 PADS - SWARM, FASTEST',      platforms: 12, obstacleCount: [3, 5], obstacleSpeed: [95, 150] },
+  easy:   { label: 'FÁCIL',   desc: '3 PLATAFORMAS - POUCOS OBSTÁCULOS LENTOS',   platforms: 3,  obstacleCount: [1, 2], obstacleSpeed: [30, 55] },
+  medium: { label: 'MÉDIO',   desc: '8 PLATAFORMAS - MAIS E MAIS RÁPIDOS',         platforms: 8,  obstacleCount: [2, 3], obstacleSpeed: [60, 100] },
+  hard:   { label: 'DIFÍCIL', desc: '12 PLATAFORMAS - ENXAME, VELOCIDADE MÁXIMA', platforms: 12, obstacleCount: [3, 5], obstacleSpeed: [95, 150] },
 };
 
 const CHAR_KEYS = ['alexandre', 'tabata', 'kaique', 'weslley'];
@@ -67,29 +67,29 @@ const CHARACTERS = {
     label: 'ALEX "GIT PUSH --FORCE" LIRA',
     shortName: 'ALEX LIRA',
     role: 'DEV',
-    desc: 'QUEBROU PROD TRES VEZES HOJE. MESMO ASSIM CONFIA NO EMPUXO.',
-    bonus: 'ROTATION +20%',
-    startToast: 'DEPLOYING TO PROD...',
+    desc: 'QUEBROU PROD TRÊS VEZES HOJE. MESMO ASSIM CONFIA NO EMPUXO.',
+    bonus: 'ROTAÇÃO +20%',
+    startToast: 'FAZENDO DEPLOY EM PROD...',
     avatar: 'assets/avatars/alexandre.png',
     stats: { rotationMult: 1.2 },
   },
   tabata: {
-    label: 'TABATA "ISSO E FEATURE" RUIZ',
+    label: 'TABATA "ISSO É FEATURE" RUIZ',
     shortName: 'TABATA RUIZ',
     role: 'DEV',
     desc: 'TRANSFORMA CRASH EM SPRINT. SE CAIU, VIROU RETRO.',
-    bonus: 'AUTO-STABILIZE +35%',
-    startToast: 'IF IT CRASHES, IT IS A RETRO',
+    bonus: 'AUTO-ESTABILIZAÇÃO +35%',
+    startToast: 'SE CRASHOU, É RETRO',
     avatar: 'assets/avatars/tabata.png',
     stats: { stabilizeMult: 1.35 },
   },
   kaique: {
-    label: 'KAIQUE "SO MAIS UM LIMAO" COSTA',
+    label: 'KAIQUE "SÓ MAIS UM LIMÃO" COSTA',
     shortName: 'KAIQUE COSTA',
     role: 'PRODUTO',
-    desc: 'O ROADMAP NAO PARA NO MVP. QUER TODOS OS LIMAOES.',
-    bonus: 'FUEL 120 / LEMON +70',
-    startToast: 'COLETANDO TODOS OS LIMAOES',
+    desc: 'O ROADMAP NÃO PARA NO MVP. QUER TODOS OS LIMÕES.',
+    bonus: 'COMB. 120 / LIMÃO +70',
+    startToast: 'COLETANDO TODOS OS LIMÕES',
     avatar: 'assets/avatars/kaique.png',
     stats: { fuelMax: 120, refuelAmount: 70 },
   },
@@ -97,8 +97,8 @@ const CHARACTERS = {
     label: 'WESLLEY "FORA DO INTERVALO" ARAUJO',
     shortName: 'WESLLEY ARAUJO',
     role: 'DADOS',
-    desc: 'PREVIU 99% DE CHANCE DE EXPLOSAO. VOCE ESTA NO 1%.',
-    bonus: 'EXTENDED HUD',
+    desc: 'PREVIU 99% DE CHANCE DE EXPLOSÃO. VOCÊ ESTÁ NO 1%.',
+    bonus: 'HUD ESTENDIDO',
     startToast: 'PROBABILIDADE: 1% DE SUCESSO',
     avatar: 'assets/avatars/weslley.png',
     stats: { extendedHud: true },
@@ -106,12 +106,12 @@ const CHARACTERS = {
 };
 
 const OBSTACLE_TYPES = {
-  asteroid:  { radius: 12, bob: 0,  reason: 'HIT AN ASTEROID' },
-  satellite: { radius: 13, bob: 0,  reason: 'HIT A SATELLITE' },
-  junk:      { radius: 9,  bob: 25, reason: 'HIT SPACE JUNK' },
-  ray:       { radius: 10, bob: 0,  reason: 'ZAPPED BY A NOXIOUS RAY' },
-  dentist:   { radius: 12, bob: 30, reason: 'THE DENTIST GOT YOU' },
-  dog:       { radius: 12, bob: 35, reason: 'A SPACE DOG GOT YOU' },
+  asteroid:  { radius: 12, bob: 0,  reason: 'COLIDIU COM ASTEROIDE' },
+  satellite: { radius: 13, bob: 0,  reason: 'COLIDIU COM SATÉLITE' },
+  junk:      { radius: 9,  bob: 25, reason: 'COLIDIU COM LIXO ESPACIAL' },
+  ray:       { radius: 10, bob: 0,  reason: 'ATINGIDO POR RAIO TÓXICO' },
+  dentist:   { radius: 12, bob: 30, reason: 'O DENTISTA TE PEGOU' },
+  dog:       { radius: 12, bob: 35, reason: 'UM CACHORRO ESPACIAL TE PEGOU' },
 };
 const OBSTACLE_KEYS = Object.keys(OBSTACLE_TYPES);
 
@@ -452,8 +452,8 @@ const DEATH_QUOTES = [
   'Desviar de obstáculos era opcional só na sua cabeça.',
   'Sua nave virou sucata premium.',
   'Se a intenção era virar meteoro, sucesso absoluto.',
-  'Game Over. Talvez pilotar no teclado não seja seu dom.',
-  'A gravidade venceu novamente. Que plot twist.',
+  'Fim de jogo. Talvez pilotar no teclado não seja seu dom.',
+  'A gravidade venceu novamente. Que reviravolta.',
 ];
 
 function pickDeathQuote() {
@@ -595,7 +595,7 @@ function startGame(diffKey, isRetry) {
   deathQuote = '';
   state = 'playing';
   addToast(CHARACTERS[currentCharacter].startToast);
-  addToast('PRESS UP TO LAUNCH');
+  addToast('PRESSIONE ↑ PARA DECOLAR');
 }
 
 // ---------------------------------------------------------------- update
@@ -620,7 +620,7 @@ function land(platform) {
   rocket.angle = 0;
   audio.setThrust(false);
   if (!platform) {
-    addToast('BACK ON EARTH');
+    addToast('DE VOLTA À TERRA');
     audio.sfxLanding();
     return;
   }
@@ -676,7 +676,7 @@ function collectLemon(platform) {
   platform.lemonCollected = true;
   targetIndex++;
   rocket.fuel = Math.min(activeStats.fuelMax, rocket.fuel + activeStats.refuelAmount);
-  addToast('+' + activeStats.refuelAmount + ' FUEL');
+  addToast('+' + activeStats.refuelAmount + ' COMB.');
   audio.sfxPickup();
   const center = platform.x + platform.w / 2;
   for (let i = 0; i < 14; i++) {
@@ -693,7 +693,7 @@ function collectLemon(platform) {
 
 function crash(reason) {
   if (state === 'exploding' || state === 'lose') return;
-  crashReason = (rocket.fuel <= 0 && reason === 'BAD LANDING') ? 'OUT OF FUEL' : reason;
+  crashReason = (rocket.fuel <= 0 && reason === 'POUSO RUIM') ? 'SEM COMBUSTÍVEL' : reason;
   ballistic = false;
   state = 'exploding';
   explodeTimer = 1.3;
@@ -807,7 +807,7 @@ function updatePlaying(dt) {
     }
     if (rocket.vy < 0 && rocket.y < platforms[platforms.length - 1].y + 60) {
       ballistic = false;
-      addToast('MISSED! CONTROL RESTORED');
+      addToast('ERROU! CONTROLE RESTAURADO');
     }
   }
 
@@ -827,20 +827,20 @@ function updatePlaying(dt) {
     const centerOverPad = Math.abs(rocket.x - (p.x + p.w / 2)) <= p.w / 2;
     if (rocket.vy <= 0 && prevBottom >= p.y - 2 && newBottom <= p.y && centerOverPad) {
       if (landingOk()) land(p);
-      else crash('BAD LANDING');
+      else crash('POUSO RUIM');
       return;
     }
     const boxOverlap = rocket.x + 8 > p.x && rocket.x - 8 < p.x + p.w &&
                        rocket.y - CONFIG.rocketHalfHeight < p.y && rocket.y + CONFIG.rocketHalfHeight > p.y - 12;
     if (boxOverlap) {
-      crash('BAD LANDING');
+      crash('POUSO RUIM');
       return;
     }
   }
 
   if (newBottom <= 0) {
     if (landingOk()) land(null);
-    else crash('BAD LANDING');
+    else crash('POUSO RUIM');
     return;
   }
 
@@ -1136,7 +1136,7 @@ function drawSmallMoon() {
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#cfe3ff';
-    ctx.fillText('MOON', moon.x, y - 30);
+    ctx.fillText('LUA', moon.x, y - 30);
     ctx.textAlign = 'left';
   }
 }
@@ -1333,9 +1333,9 @@ function drawSlingshotUI() {
   }
   ctx.globalAlpha = 1;
   drawCenteredText([
-    ['DRAG THE ROCKET BACK AND RELEASE', 622, 12, '#cfe3ff'],
-    ['HIT THE MOON!', 644, 14, '#ffd166', true],
-    ['(OR AIM WITH ARROWS + SPACE)', 668, 10, '#8892a6'],
+    ['ARRASTE O FOGUETE PRA TRÁS E SOLTE', 622, 12, '#cfe3ff'],
+    ['ACERTE A LUA!', 644, 14, '#ffd166', true],
+    ['(OU MIRE COM SETAS + ESPAÇO)', 668, 10, '#8892a6'],
   ]);
 }
 
@@ -1371,7 +1371,7 @@ function drawHUD() {
   ctx.textAlign = 'left';
   ctx.font = 'bold 10px monospace';
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('FUEL', 20, 26);
+  ctx.fillText('COMB.', 20, 26);
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   roundRect(20, 32, 150, 8, 4);
   ctx.fill();
@@ -1393,14 +1393,14 @@ function drawHUD() {
   const distance = slingScene
     ? Math.max(0, Math.round((moon.y - rocket.y) / 10))
     : Math.max(0, Math.round((target.y - rocket.y) / 10));
-  const label = slingScene ? 'MOON ' : (target.isPlanet ? 'PLANET ' : 'NEXT LEMON ');
+  const label = slingScene ? 'LUA ' : (target.isPlanet ? 'PLANETA ' : 'PRÓX. LIMÃO ');
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = '#cfe3ff';
   ctx.fillText(label + distance + 'm', 20, 58);
   if (state === 'slingshot') {
     ctx.fillStyle = '#ffd166';
-    ctx.fillText('ANGLE ' + Math.round(slingAngle * 180 / Math.PI), 160, 58);
-    ctx.fillText('POWER ' + Math.round(slingPower * 100) + '%', 245, 58);
+    ctx.fillText('ÂNGULO ' + Math.round(slingAngle * 180 / Math.PI), 160, 58);
+    ctx.fillText('POTÊNCIA ' + Math.round(slingPower * 100) + '%', 245, 58);
   } else {
     ctx.fillStyle = speedColor(rocket.vx, CONFIG.landingMaxVx);
     ctx.fillText('VX ' + (Math.abs(rocket.vx) / 10).toFixed(1), 160, 58);
@@ -1416,15 +1416,15 @@ function drawHUD() {
     const angOk = Math.abs(normalizeAngle(rocket.angle)) <= CONFIG.landingMaxAngle;
     ctx.font = 'bold 10px monospace';
     ctx.fillStyle = '#8fa3c8';
-    ctx.fillText('ANG ' + angleDeg + '\u00B0', 20, 74);
+    ctx.fillText('ÂNG ' + angleDeg + '\u00B0', 20, 74);
     ctx.fillStyle = speedColor(100 - fuelPct, 60);
-    ctx.fillText('FUEL ' + fuelPct + '%', 95, 74);
+    ctx.fillText('COMB. ' + fuelPct + '%', 95, 74);
     ctx.fillStyle = vxOk ? '#57c74f' : '#ff5050';
     ctx.fillText('VX' + (vxOk ? '\u2713' : '\u2717'), 175, 74);
     ctx.fillStyle = vyOk ? '#57c74f' : '#ff5050';
     ctx.fillText('VY' + (vyOk ? '\u2713' : '\u2717'), 215, 74);
     ctx.fillStyle = angOk ? '#57c74f' : '#ff5050';
-    ctx.fillText('ANG' + (angOk ? '\u2713' : '\u2717'), 255, 74);
+    ctx.fillText('ÂNG' + (angOk ? '\u2713' : '\u2717'), 255, 74);
   }
 
   // progress + attempts + pilot avatar
@@ -1433,11 +1433,11 @@ function drawHUD() {
   ctx.textAlign = 'right';
   ctx.fillStyle = '#cfe3ff';
   const total = platforms.length - 1;
-  const progressText = slingScene ? 'TARGET: MOON'
-    : (target.isPlanet ? 'TARGET: PLANET' : 'PAD ' + (targetIndex + 1) + '/' + total);
+  const progressText = slingScene ? 'ALVO: LUA'
+    : (target.isPlanet ? 'ALVO: PLANETA' : 'PLAT. ' + (targetIndex + 1) + '/' + total);
   ctx.fillText(progressText, hudRight, 26);
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('ATTEMPT ' + attempts, hudRight, 42);
+  ctx.fillText('TENTATIVA ' + attempts, hudRight, 42);
   ctx.fillText(CHARACTERS[currentCharacter].shortName, hudRight, 58);
   if (activeStats.extendedHud) {
     ctx.fillText(DIFFICULTIES[currentDiff].label, hudRight, 74);
@@ -1552,7 +1552,7 @@ function renderTitle() {
   drawCenteredText([
     ['ROCKET', 160, 52, '#f4f6fb', true],
     ['LEMON', 220, 52, '#ffd166', true],
-    ['LAUNCH TO THE MOON', 258, 14, '#cfe3ff'],
+    ['DECOLE ATÉ A LUA', 258, 14, '#cfe3ff'],
   ]);
   ctx.save();
   ctx.translate(W / 2, 400);
@@ -1561,11 +1561,11 @@ function renderTitle() {
   ctx.drawImage(flame, -15, 46, 30, 24);
   ctx.restore();
   if (Math.floor(time * 2) % 2 === 0) {
-    drawCenteredText([['PRESS ENTER TO START', 560, 16, '#ffffff', true]]);
+    drawCenteredText([['PRESSIONE ENTER PARA COMEÇAR', 560, 16, '#ffffff', true]]);
   }
   drawCenteredText([
-    ['LEFT/RIGHT ROTATE - UP THRUST - M MUTE', 640, 11, '#8892a6'],
-    ['GRAB EVERY LEMON. LAND GENTLY ON THE MOON.', 662, 11, '#8892a6'],
+    ['←/→ GIRAR - ↑ EMPUXO - M SOM', 640, 11, '#8892a6'],
+    ['PEGUE CADA LIMÃO. POUSE SUAVEMENTE NA LUA.', 662, 11, '#8892a6'],
   ]);
   drawVignette();
 }
@@ -1580,7 +1580,7 @@ function renderCharacterMenu() {
   const textW = cardW - 72;
 
   drawBackground(time * 12);
-  drawCenteredText([['SELECT PILOT', 130, 24, '#ffd166', true]]);
+  drawCenteredText([['ESCOLHA O PILOTO', 130, 24, '#ffd166', true]]);
   CHAR_KEYS.forEach((key, i) => {
     const ch = CHARACTERS[key];
     const top = cardTop + i * cardGap;
@@ -1607,13 +1607,13 @@ function renderCharacterMenu() {
     ctx.fillText(truncateText(ch.role + ' - ' + ch.bonus, textW, '10px monospace'), textX, roleY);
     drawWrappedText(ch.desc, textX, roleY + 13, textW, '10px monospace', descColor, 12, 2);
   });
-  drawCenteredText([['UP/DOWN SELECT - 1-4 SHORTCUT - ENTER CONTINUE - ESC BACK', 680, 10, '#8892a6']]);
+  drawCenteredText([['↑/↓ SELECIONAR - 1-4 ATALHO - ENTER CONTINUAR - ESC VOLTAR', 680, 10, '#8892a6']]);
   drawVignette();
 }
 
 function renderMenu() {
   drawBackground(time * 12);
-  drawCenteredText([['SELECT DIFFICULTY', 150, 24, '#ffd166', true]]);
+  drawCenteredText([['ESCOLHA A DIFICULDADE', 150, 24, '#ffd166', true]]);
   DIFF_KEYS.forEach((key, i) => {
     const diff = DIFFICULTIES[key];
     const y = 260 + i * 90;
@@ -1631,7 +1631,7 @@ function renderMenu() {
       [diff.desc, y + 24, 11, selected ? '#cfe3ff' : '#5a6478'],
     ]);
   });
-  drawCenteredText([['UP/DOWN SELECT - ENTER LAUNCH - ESC BACK', 620, 11, '#8892a6']]);
+  drawCenteredText([['↑/↓ SELECIONAR - ENTER DECOLAR - ESC VOLTAR', 620, 11, '#8892a6']]);
   drawVignette();
 }
 
@@ -1649,8 +1649,8 @@ function renderWorld() {
   if (state === 'slingshot' && slingBanner > 0) {
     ctx.globalAlpha = Math.min(1, slingBanner);
     drawCenteredText([
-      ['SLINGSHOT MODE!', 300, 32, '#ffd166', true],
-      ['NEW MECHANIC: DRAG BACK AND HIT THE MOON', 336, 12, '#ffffff'],
+      ['MODO ESTILINGUE!', 300, 32, '#ffd166', true],
+      ['NOVA MECÂNICA: PUXE E ACERTE A LUA', 336, 12, '#ffffff'],
     ]);
     ctx.globalAlpha = 1;
   }
@@ -1671,10 +1671,10 @@ function renderWorld() {
     ctx.lineWidth = 1;
     ctx.stroke();
     drawCenteredText([
-      ['YOU REACHED', 148, 30, '#ffd166', true],
-      ['THE MOON!', 186, 30, '#ffd166', true],
-      ['ATTEMPTS: ' + attempts, 228, 14, '#cfe3ff'],
-      ['R RETRY - ENTER MENU', 264, 13, '#ffffff'],
+      ['VOCÊ CHEGOU', 148, 30, '#ffd166', true],
+      ['NA LUA!', 186, 30, '#ffd166', true],
+      ['TENTATIVAS: ' + attempts, 228, 14, '#cfe3ff'],
+      ['R REPETIR - ENTER MENU', 264, 13, '#ffffff'],
     ]);
   } else if (state === 'lose') {
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -1686,7 +1686,7 @@ function renderWorld() {
     ctx.lineWidth = 1;
     ctx.stroke();
     drawCenteredText([
-      ['CRASHED!', 280, 36, '#ff4d5e', true],
+      ['EXPLODIU!', 280, 36, '#ff4d5e', true],
     ]);
     const quoteY = 320;
     const quoteFont = 'bold 12px monospace';
@@ -1696,8 +1696,8 @@ function renderWorld() {
     const reasonY = quoteY + quoteLines * 15 + 12;
     drawCenteredText([
       [crashReason, reasonY, 11, '#8fa3c8'],
-      ['ATTEMPT ' + attempts, reasonY + 26, 13, '#8fa3c8'],
-      ['R RETRY - ENTER MENU', reasonY + 58, 13, '#ffffff'],
+      ['TENTATIVA ' + attempts, reasonY + 26, 13, '#8fa3c8'],
+      ['R REPETIR - ENTER MENU', reasonY + 58, 13, '#ffffff'],
     ]);
   }
 }
