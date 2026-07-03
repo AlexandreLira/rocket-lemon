@@ -1508,8 +1508,8 @@ function drawCoins() {
     const y = sy(coin.y) + Math.sin(time * 3 + coin.bobPhase) * 3;
     if (y < -30 || y > H + 30) continue;
     ctx.shadowColor = '#ffd166';
-    ctx.shadowBlur = 12;
-    ctx.drawImage(SPRITES.coin, coin.x - 6, y - 6, 12, 12);
+    ctx.shadowBlur = 18;
+    ctx.drawImage(SPRITES.coin, coin.x - 12, y - 12, 24, 24);
     ctx.shadowBlur = 0;
   }
 }
