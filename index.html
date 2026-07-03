@@ -731,7 +731,9 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
-let state = 'title'; // title | character | difficulty | shop | playing | slingshot | exploding | win | lose
+let state = 'title'; // title | character | difficulty | shop | playing | paused | resuming | slingshot | exploding | win | lose
+let stateBeforePause = 'playing'; // estado retomado após a contagem de despausa
+let resumeTimer = 0;              // contagem regressiva (s) ao retomar o jogo
 let menuIndex = 0;
 let currentDiff = 'easy';
 let currentCharacter = 'alexandre';
@@ -2019,7 +2021,8 @@ function updateParticles(dt) {
 }
 
 function update(dt) {
-  time += dt;
+  // congela animações do mundo enquanto pausado / na contagem de retomada
+  if (state !== 'paused' && state !== 'resuming') time += dt;
   for (const t of toasts) t.t -= dt;
   toasts = toasts.filter(t => t.t > 0);
   updateThrustParticles(dt);
@@ -2059,6 +2062,10 @@ function update(dt) {
     updateObstacles(dt);
     updateHazards(dt);
     updateParticles(dt);
+  } else if (state === 'resuming') {
+    // jogo congelado durante a contagem regressiva antes de retomar
+    resumeTimer -= dt;
+    if (resumeTimer <= 0) state = stateBeforePause;
   }
 
   if (state === 'playing' || state === 'slingshot' || state === 'exploding' || state === 'win' || state === 'lose') {
@@ -3021,12 +3028,45 @@ function renderWorld() {
   }
 }
 
+function drawPauseOverlay() {
+  ctx.fillStyle = 'rgba(6,10,22,0.68)';
+  ctx.fillRect(0, 0, W, H);
+  drawCenteredText([
+    ['PAUSADO', H / 2 - 40, 46, '#ffd166', true],
+    [isMobile ? 'TOQUE PARA CONTINUAR' : 'ENTER / ESC PARA CONTINUAR', H / 2 + 24, 14, '#cfe3ff'],
+    [isMobile ? '' : 'Q PARA SAIR AO MENU', H / 2 + 54, 12, '#8892a6'],
+  ]);
+}
+
+function drawResumeCountdown() {
+  ctx.fillStyle = 'rgba(6,10,22,0.5)';
+  ctx.fillRect(0, 0, W, H);
+  const secondsLeft = Math.ceil(resumeTimer);
+  // pulso de escala conforme cada segundo passa
+  const frac = resumeTimer - Math.floor(resumeTimer);
+  const scale = 1 + frac * 0.4;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(scale, scale);
+  ctx.font = 'bold 96px monospace';
+  ctx.shadowColor = '#ffd166';
+  ctx.shadowBlur = 24;
+  ctx.fillStyle = '#ffd166';
+  ctx.fillText(String(secondsLeft), 0, 34);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+  drawCenteredText([['RETOMANDO...', H / 2 + 90, 14, '#cfe3ff']]);
+}
+
 function render() {
   if (state === 'title') renderTitle();
   else if (state === 'character') renderCharacterMenu();
   else if (state === 'difficulty') renderMenu();
   else if (state === 'shop') renderShop();
   else renderWorld();
+  if (state === 'paused') drawPauseOverlay();
+  else if (state === 'resuming') drawResumeCountdown();
 }
 
 // ---------------------------------------------------------------- input
@@ -3078,7 +3118,7 @@ window.addEventListener('keydown', (e) => {
       state = 'difficulty';
       menuIndex = 0;
     } else if (e.key === 'l' || e.key === 'L') { openShop('character'); }
-    else if (e.key === 'Escape' || e.key === 'Backspace') { state = 'title'; }
+    else if (e.key === 'Escape' || e.key === 'Backspace') { audio.stopMusic(); audio.stopVictorySong(); state = 'title'; }
   } else if (state === 'shop') {
     const keys = getShopItemKeys();
     const cols = getShopLayout().cols;
@@ -3095,7 +3135,7 @@ window.addEventListener('keydown', (e) => {
     } else if (e.key === 'Escape') {
       leaveShop();
     } else if (e.key === 'Backspace') {
-      state = 'title';
+      audio.stopMusic(); audio.stopVictorySong(); state = 'title';
     }
   } else if (state === 'difficulty') {
     if (e.key === 'ArrowUp' && !e.repeat) menuIndex = (menuIndex + 2) % 3;
@@ -3110,9 +3150,23 @@ window.addEventListener('keydown', (e) => {
     else if (e.key === 'Escape') { audio.setThrust(false); state = 'character'; menuIndex = CHAR_KEYS.indexOf(currentCharacter); }
   } else if (state === 'win' || state === 'lose') {
     if (e.key === 'r' || e.key === 'R') startGame(currentDiff, true);
-    else if (e.key === 'Enter' || e.key === 'Escape') state = 'title';
+    else if (e.key === 'Enter' || e.key === 'Escape') { audio.stopMusic(); audio.stopVictorySong(); state = 'title'; }
   } else if (state === 'playing') {
-    if (e.key === 'Escape') { audio.setThrust(false); state = 'character'; menuIndex = CHAR_KEYS.indexOf(currentCharacter); }
+    if (e.key === 'Escape') {
+      audio.setThrust(false);
+      keys.left = keys.right = keys.up = keys.down = false;
+      stateBeforePause = 'playing';
+      state = 'paused';
+    }
+  } else if (state === 'paused') {
+    if (e.key === 'q' || e.key === 'Q') {
+      audio.setThrust(false);
+      state = 'character';
+      menuIndex = CHAR_KEYS.indexOf(currentCharacter);
+    } else if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') {
+      resumeTimer = 2;
+      state = 'resuming';
+    }
   }
 
   if (e.key === 'ArrowLeft') keys.left = true;
@@ -3173,10 +3227,15 @@ function handleMenuTap(x, y) {
     }
   } else if (state === 'win' || state === 'lose') {
     if (y > H / 2) {
+      audio.stopMusic();
+      audio.stopVictorySong();
       state = 'title';
     } else {
       startGame(currentDiff, true);
     }
+  } else if (state === 'paused') {
+    resumeTimer = 2;
+    state = 'resuming';
   }
 }
 
