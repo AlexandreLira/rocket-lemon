@@ -464,25 +464,32 @@ const audio = {
   },
 
   startMusic() {
-    const LEAD = [76, 0, 79, 0, 83, 0, 79, 0, 76, 0, 79, 0, 84, 83, 79, 0,
-                  76, 0, 79, 0, 83, 0, 86, 0, 88, 0, 86, 83, 79, 0, 0, 0];
-    const BASS = [40, 43, 45, 43, 36, 40, 43, 47];
-    const stepDuration = 0.115;
+    // Espaço Lo-fi: melodia lenta e esparsa, ondas suaves e acordes flutuantes.
+    const LEAD = [72, 0, 0, 0, 0, 0, 0, 0, 74, 0, 0, 0, 71, 0, 0, 0,
+                  69, 0, 0, 0, 0, 0, 0, 0, 67, 0, 0, 0, 72, 0, 74, 0];
+    const stepDuration = 0.26;
+    const len = 32;
     this.musicNextTime = this.ctx.currentTime + 0.1;
     if (this.musicTimer) clearInterval(this.musicTimer);
     this.musicTimer = setInterval(() => {
       if (!this.ctx) return;
       while (this.musicNextTime < this.ctx.currentTime + 0.2) {
-        const step = this.musicStep % 32;
+        const step = this.musicStep % len;
+        const d = stepDuration;
         const lead = LEAD[step];
-        if (lead) this.note(lead, this.musicNextTime, stepDuration * 0.9, 'square', 0.05);
-        if (step % 4 === 0) {
-          this.note(BASS[(step / 4) % 8], this.musicNextTime, stepDuration * 3.5, 'triangle', 0.09);
+        if (lead) this.note(lead, this.musicNextTime, d * 3, 'sine', 0.05);
+        if (step === 0) {
+          [60, 64, 67, 71].forEach(n => this.note(n, this.musicNextTime, d * 15, 'sine', 0.028));
+          this.note(36, this.musicNextTime, d * 15, 'triangle', 0.05);
+        }
+        if (step === 16) {
+          [57, 60, 64, 67].forEach(n => this.note(n, this.musicNextTime, d * 15, 'sine', 0.028));
+          this.note(33, this.musicNextTime, d * 15, 'triangle', 0.05);
         }
         this.musicNextTime += stepDuration;
         this.musicStep++;
       }
-    }, 80);
+    }, 25);
   },
 
   stopMusic() {
@@ -497,7 +504,7 @@ const audio = {
       this.victorySong.volume = 0.7;
     }
     this.victorySong.muted = this.muted;
-    this.victorySong.currentTime = 0;
+    this.victorySong.currentTime = 58; // pula direto pro refrão "We are the champions"
     this.victorySong.play().catch(() => {});
   },
 
