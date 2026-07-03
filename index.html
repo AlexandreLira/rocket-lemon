@@ -1085,6 +1085,23 @@ function drawCosmeticRocketAt(cx, cy, angle, scale, skinId, trailId, accessoryId
   ctx.restore();
 }
 
+function drawCardCornerAccents(x, y, w, pulse) {
+  const len = 14;
+  const alpha = 0.5 + pulse * 0.3;
+  ctx.strokeStyle = 'rgba(255,209,102,' + alpha + ')';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x + 8, y);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x, y + len);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + w - 8, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + len);
+  ctx.stroke();
+}
+
 function drawShopItemCard(category, id, rect, selected) {
   const item = SHOP_CATALOGS[category][id];
   const { x, y, w, h } = rect;
