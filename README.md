@@ -48,8 +48,8 @@ Sem dependências, sem build — basta abrir no navegador.
 |--------|------|-------|
 | Alex "git push --force" Lira | Dev | Rotação +20% |
 | Tabata "Isso É Feature" Ruiz | Dev | Auto-estabilização +35% |
-| Kaique "Só Mais Um Limão" Costa | Produto | Combustível 120, limão +70 |
-| Weslley "Fora Do Intervalo" Araujo | Dados | HUD estendido (ângulo, %, margens de pouso) |
+| Kaique "Só Mais Um Limão" Costa | Dados | Combustível 120, limão +70 |
+| Weslley "Fora Do Intervalo" Araujo | Produto | HUD estendido (ângulo, %, margens de pouso) |
 
 ### Modo estilingue
 
