@@ -281,6 +281,8 @@ const audio = {
   muted: false,
   musicStep: 0,
   musicNextTime: 0,
+  musicTimer: null,
+  victorySong: null,
 
   init() {
     if (this.ctx) return;
@@ -318,6 +320,7 @@ const audio = {
   toggleMute() {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.6;
+    if (this.victorySong) this.victorySong.muted = this.muted;
   },
 
   setThrust(on) {
@@ -402,12 +405,14 @@ const audio = {
   },
 
   startMusic() {
+    // Espaço Lo-fi: melodia lenta e esparsa, ondas suaves e acordes flutuantes.
     const LEAD = [72, 0, 0, 0, 0, 0, 0, 0, 74, 0, 0, 0, 71, 0, 0, 0,
                   69, 0, 0, 0, 0, 0, 0, 0, 67, 0, 0, 0, 72, 0, 74, 0];
     const stepDuration = 0.26;
     const len = 32;
     this.musicNextTime = this.ctx.currentTime + 0.1;
-    setInterval(() => {
+    if (this.musicTimer) clearInterval(this.musicTimer);
+    this.musicTimer = setInterval(() => {
       if (!this.ctx) return;
       while (this.musicNextTime < this.ctx.currentTime + 0.2) {
         const step = this.musicStep % len;
@@ -426,6 +431,26 @@ const audio = {
         this.musicStep++;
       }
     }, 25);
+  },
+
+  stopMusic() {
+    if (this.musicTimer) { clearInterval(this.musicTimer); this.musicTimer = null; }
+  },
+
+  playVictorySong() {
+    // para a trilha 8-bit e toca "We Are The Champions"
+    this.stopMusic();
+    if (!this.victorySong) {
+      this.victorySong = new Audio('assets/we-are-the-champions.mp3');
+      this.victorySong.volume = 0.7;
+    }
+    this.victorySong.muted = this.muted;
+    this.victorySong.currentTime = 0;
+    this.victorySong.play().catch(() => {});
+  },
+
+  stopVictorySong() {
+    if (this.victorySong) { this.victorySong.pause(); this.victorySong.currentTime = 0; }
   },
 };
 
@@ -580,6 +605,8 @@ function getActiveStats() {
 }
 
 function startGame(diffKey, isRetry) {
+  audio.stopVictorySong();
+  if (audio.ctx && !audio.musicTimer) audio.startMusic();
   currentDiff = diffKey;
   if (!isRetry) deathQuoteBag = [];
   attempts = isRetry ? attempts + 1 : 1;
@@ -686,6 +713,7 @@ function moonImpactWin() {
   lemonRain = [];
   audio.setThrust(false);
   audio.sfxVictory();
+  audio.playVictorySong();
 }
 
 function collectLemon(platform) {
