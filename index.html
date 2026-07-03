@@ -58,49 +58,45 @@ const CONFIG = {
 
 const DIFF_KEYS = ['easy', 'medium', 'hard'];
 const DIFFICULTIES = {
-  easy:   { label: 'FÁCIL',   desc: '3 PLATAFORMAS - POUCOS OBSTÁCULOS LENTOS',   platforms: 3,  obstacleCount: [1, 2], obstacleSpeed: [30, 55] },
-  medium: { label: 'MÉDIO',   desc: '8 PLATAFORMAS - MAIS E MAIS RÁPIDOS',         platforms: 8,  obstacleCount: [2, 3], obstacleSpeed: [60, 100] },
-  hard:   { label: 'DIFÍCIL', desc: '12 PLATAFORMAS - ENXAME, VELOCIDADE MÁXIMA', platforms: 12, obstacleCount: [3, 5], obstacleSpeed: [95, 150] },
+  easy:   { label: 'FÁCIL',   desc: '3 PLATAFORMAS - POUCOS OBSTÁCULOS LENTOS',   platforms: 3,  obstacleCount: [1, 2], obstacleSpeed: [30, 55],  cometMin: 7, cometMax: 12, flareMin: 8, flareMax: 13 },
+  medium: { label: 'MÉDIO',   desc: '8 PLATAFORMAS - MAIS E MAIS RÁPIDOS',         platforms: 8,  obstacleCount: [2, 3], obstacleSpeed: [60, 100], cometMin: 5, cometMax: 9,  flareMin: 6, flareMax: 10 },
+  hard:   { label: 'DIFÍCIL', desc: '12 PLATAFORMAS - ENXAME, VELOCIDADE MÁXIMA', platforms: 12, obstacleCount: [3, 5], obstacleSpeed: [95, 150], cometMin: 3, cometMax: 6,  flareMin: 4, flareMax: 7 },
 };
 
 const CHAR_KEYS = ['alexandre', 'tabata', 'kaique', 'weslley'];
 const CHARACTERS = {
   alexandre: {
-    label: 'ALEX "GIT PUSH --FORCE" LIRA',
+    label: 'ALEX LIRA',
     shortName: 'ALEX LIRA',
     role: 'DEV',
     desc: 'QUEBROU PROD TRÊS VEZES HOJE. MESMO ASSIM CONFIA NO EMPUXO.',
-    bonus: 'ROTAÇÃO +20%',
     startToast: 'FAZENDO DEPLOY EM PROD...',
     avatar: 'assets/avatars/alexandre.png',
     stats: { rotationMult: 1.2 },
   },
   tabata: {
-    label: 'TABATA "ISSO É FEATURE" RUIZ',
+    label: 'TABATA RUIZ',
     shortName: 'TABATA RUIZ',
     role: 'DEV',
     desc: 'TRANSFORMA CRASH EM SPRINT. SE CAIU, VIROU RETRO.',
-    bonus: 'AUTO-ESTABILIZAÇÃO +35%',
     startToast: 'SE CRASHOU, É RETRO',
     avatar: 'assets/avatars/tabata.png',
     stats: { stabilizeMult: 1.35 },
   },
   kaique: {
-    label: 'KAIQUE "SÓ MAIS UM LIMÃO" COSTA',
+    label: 'KAIQUE COSTA',
     shortName: 'KAIQUE COSTA',
     role: 'DADOS',
-    desc: 'O ROADMAP NÃO PARA NO MVP. QUER TODOS OS LIMÕES.',
-    bonus: 'COMB. 120 / LIMÃO +70',
+    desc: 'SÓ MAIS UM PASTEL',
     startToast: 'COLETANDO TODOS OS LIMÕES',
     avatar: 'assets/avatars/kaique.png',
     stats: { fuelMax: 120, refuelAmount: 70 },
   },
   weslley: {
-    label: 'WESLLEY "FORA DO INTERVALO" ARAUJO',
+    label: 'WESLLEY ARAUJO',
     shortName: 'WESLLEY ARAUJO',
     role: 'PRODUTO',
     desc: 'PREVIU 99% DE CHANCE DE EXPLOSÃO. VOCÊ ESTÁ NO 1%.',
-    bonus: 'HUD ESTENDIDO',
     startToast: 'PROBABILIDADE: 1% DE SUCESSO',
     avatar: 'assets/avatars/weslley.png',
     stats: { extendedHud: true },
@@ -383,19 +379,54 @@ const audio = {
   sfxBark() {
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime;
-    [0, 0.16].forEach((delay) => {
-      const osc = this.ctx.createOscillator();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(340, t0 + delay);
-      osc.frequency.exponentialRampToValueAtTime(150, t0 + delay + 0.12);
+    // dois "au au": cada woof tem um sweep de tom que sobe rápido e cai (contorno
+    // típico de latido), dois osciladores desafinados para dar corpo, um filtro
+    // que abre e fecha como formante vocal, e um estalo de ruído no ataque
+    [0, 0.22].forEach((delay, idx) => {
+      const t = t0 + delay;
+      const dur = 0.18;
+      const base = idx === 0 ? 300 : 260; // o segundo woof é levemente mais grave
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.Q.value = 4;
+      filter.frequency.setValueAtTime(900, t);
+      filter.frequency.linearRampToValueAtTime(1500, t + 0.04);
+      filter.frequency.exponentialRampToValueAtTime(500, t + dur);
+
       const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, t0 + delay);
-      gain.gain.linearRampToValueAtTime(0.18, t0 + delay + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + delay + 0.15);
-      osc.connect(gain);
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.linearRampToValueAtTime(0.22, t + 0.02);
+      gain.gain.setValueAtTime(0.22, t + 0.07);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      filter.connect(gain);
       gain.connect(this.master);
-      osc.start(t0 + delay);
-      osc.stop(t0 + delay + 0.17);
+
+      [1, 1.5].forEach((mult, i) => {
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(base * mult * 0.7, t);
+        osc.frequency.linearRampToValueAtTime(base * mult, t + 0.03);
+        osc.frequency.exponentialRampToValueAtTime(base * mult * 0.55, t + dur);
+        osc.detune.value = i === 0 ? -8 : 12;
+        osc.connect(filter);
+        osc.start(t);
+        osc.stop(t + dur + 0.02);
+      });
+
+      // transiente de ruído (a consoante "b" do woof)
+      const noiseDur = 0.05;
+      const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * noiseDur, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.12, t);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, t + noiseDur);
+      noise.connect(noiseGain);
+      noiseGain.connect(this.master);
+      noise.start(t);
     });
   },
 
@@ -565,6 +596,9 @@ function pickDeathQuote() {
 
 let platforms = [];
 let obstacles = [];
+let hazards = [];       // cometas e raios solares (dinâmicos, em espaço de tela)
+let cometTimer = 0;
+let flareTimer = 0;
 let particles = [];
 let thrustParticles = [];
 let toasts = [];
@@ -657,6 +691,10 @@ function generateWorld(diffKey) {
       });
     }
   }
+
+  hazards = [];
+  cometTimer = 1 + Math.random() * (diff.cometMax - diff.cometMin) + diff.cometMin;
+  flareTimer = 1 + Math.random() * (diff.flareMax - diff.flareMin) + diff.flareMin;
 }
 
 function getActiveStats() {
@@ -864,8 +902,110 @@ function obstacleY(o) {
   return o.y + (o.bobAmp ? Math.sin(time * 1.6 + o.bobPhase) * o.bobAmp : 0);
 }
 
+// ---------------------------------------------------------------- hazards
+// Cometas e raios solares atravessam a tela rápido e somem. Diferente dos
+// obstáculos (presos ao mundo), vivem em espaço de tela: cruzam a viewport
+// independentemente do scroll da câmera.
+
+function spawnComet() {
+  const edge = Math.random();
+  let x, y, vx, vy;
+  if (edge < 0.5) {            // vem de cima
+    x = Math.random() * W; y = -40;
+    vx = (Math.random() * 2 - 1) * 260; vy = 420 + Math.random() * 200;
+  } else if (edge < 0.75) {    // vem da esquerda
+    x = -40; y = Math.random() * H * 0.65;
+    vx = 430 + Math.random() * 190; vy = -90 + Math.random() * 350;
+  } else {                     // vem da direita
+    x = W + 40; y = Math.random() * H * 0.65;
+    vx = -(430 + Math.random() * 190); vy = -90 + Math.random() * 350;
+  }
+  hazards.push({ type: 'comet', phase: 'active', x, y, vx, vy, radius: 12, trail: [] });
+}
+
+function spawnFlare() {
+  // raio solar disparado de longe: telegrafa no canto direito antes de cruzar
+  const y = 90 + Math.random() * (H - 180);
+  hazards.push({
+    type: 'flare', phase: 'warning', x: W + 6, y,
+    vx: -(560 + Math.random() * 200), vy: (Math.random() * 2 - 1) * 30,
+    radius: 10, warnTimer: 0.55, trail: [],
+  });
+}
+
+function updateHazards(dt) {
+  const diff = DIFFICULTIES[currentDiff];
+  const rx = rocket.x, ry = sy(rocket.y);
+
+  cometTimer -= dt;
+  if (cometTimer <= 0) {
+    spawnComet();
+    cometTimer = diff.cometMin + Math.random() * (diff.cometMax - diff.cometMin);
+  }
+  flareTimer -= dt;
+  if (flareTimer <= 0) {
+    spawnFlare();
+    flareTimer = diff.flareMin + Math.random() * (diff.flareMax - diff.flareMin);
+  }
+
+  for (let i = hazards.length - 1; i >= 0; i--) {
+    const h = hazards[i];
+    if (h.phase === 'warning') {
+      h.warnTimer -= dt;
+      if (h.warnTimer <= 0) h.phase = 'active';
+      continue;
+    }
+    h.trail.push({ x: h.x, y: h.y });
+    if (h.trail.length > 8) h.trail.shift();
+    h.x += h.vx * dt;
+    h.y += h.vy * dt;
+
+    if (state === 'playing' && !rocket.landed) {
+      const dx = h.x - rx, dy = h.y - ry;
+      if (dx * dx + dy * dy < (h.radius + CONFIG.rocketRadius * 0.8) ** 2) {
+        crash(h.type === 'comet' ? 'ATINGIDO POR UM COMETA' : 'ATINGIDO POR UM RAIO SOLAR');
+        return;
+      }
+    }
+
+    if (h.x < -80 || h.x > W + 80 || h.y < -80 || h.y > H + 80) hazards.splice(i, 1);
+  }
+}
+
+function drawHazards() {
+  for (const h of hazards) {
+    if (h.type === 'flare' && h.phase === 'warning') {
+      const pulse = 0.4 + 0.5 * Math.abs(Math.sin(time * 12));
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = '#ff9d3d';
+      ctx.beginPath(); ctx.arc(h.x, h.y, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#ffd94a';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(h.x, h.y, 22, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    // rastro
+    for (let i = 0; i < h.trail.length; i++) {
+      const t = h.trail[i];
+      const a = (i / h.trail.length) * 0.5;
+      ctx.fillStyle = h.type === 'comet' ? 'rgba(160,200,255,' + a.toFixed(2) + ')' : 'rgba(255,160,60,' + a.toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(t.x, t.y, h.radius * (0.3 + 0.5 * (i / h.trail.length)), 0, Math.PI * 2); ctx.fill();
+    }
+    // brilho externo
+    ctx.fillStyle = h.type === 'comet' ? 'rgba(140,190,255,0.5)' : 'rgba(255,150,50,0.55)';
+    ctx.beginPath(); ctx.arc(h.x, h.y, h.radius * 1.7, 0, Math.PI * 2); ctx.fill();
+    // núcleo
+    ctx.fillStyle = h.type === 'comet' ? '#dfeaff' : '#fff1c2';
+    ctx.beginPath(); ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 function updatePlaying(dt) {
   updateObstacles(dt);
+  updateHazards(dt);
+  if (state !== 'playing') return; // updateHazards pode disparar crash()
   const activeStats = getActiveStats();
 
   if (rocket.landed) {
@@ -1038,6 +1178,7 @@ function update(dt) {
     updatePlaying(dt);
   } else if (state === 'slingshot') {
     updateObstacles(dt);
+    updateHazards(dt);
     slingBanner -= dt;
     if (keys.left) slingAngle -= 1.2 * dt;
     if (keys.right) slingAngle += 1.2 * dt;
@@ -1051,6 +1192,7 @@ function update(dt) {
     rocket.y = slingPad.y + 34 - Math.cos(slingAngle) * pull;
   } else if (state === 'exploding') {
     updateObstacles(dt);
+    updateHazards(dt);
     updateParticles(dt);
     explodeTimer -= dt;
     if (explodeTimer <= 0) {
@@ -1060,10 +1202,12 @@ function update(dt) {
   } else if (state === 'win') {
     winTime += dt;
     updateObstacles(dt);
+    updateHazards(dt);
     updateParticles(dt);
     updateCelebration(dt);
   } else if (state === 'lose') {
     updateObstacles(dt);
+    updateHazards(dt);
     updateParticles(dt);
   }
 
@@ -1610,7 +1754,7 @@ function drawHUD() {
   ctx.fillStyle = '#cfe3ff';
   const total = platforms.length - 1;
   const progressText = slingScene ? 'ALVO: LUA'
-    : (target.isPlanet ? 'ALVO: PLANETA' : 'PLAT. ' + (targetIndex + 1) + '/' + total);
+    : (target.isPlanet ? 'ALVO: PLANETA' : 'PLAT. ' + targetIndex + '/' + total);
   ctx.fillText(progressText, hudRight, 26);
   ctx.fillStyle = '#8fa3c8';
   ctx.fillText('TENTATIVA ' + attempts, hudRight, 42);
@@ -1871,15 +2015,12 @@ function drawCharacterCard(key, rect, selected) {
   ctx.font = '13px monospace';
   const badgeW = 28;
   const roleW = ctx.measureText(ch.role).width;
-  const bonusW = ctx.measureText(' · ' + ch.bonus).width;
-  const roleTotalW = badgeW + roleW + bonusW;
+  const roleTotalW = badgeW + roleW;
   const roleStartX = textCenterX - roleTotalW / 2;
   drawRoleBadge(ch.role, roleStartX, roleY, selected);
   ctx.textAlign = 'left';
   ctx.fillStyle = selected ? '#ffd166' : '#5a6478';
   ctx.fillText(ch.role, roleStartX + badgeW, roleY);
-  ctx.fillStyle = selected ? '#cfe3ff' : '#5a6478';
-  ctx.fillText(' · ' + ch.bonus, roleStartX + badgeW + roleW, roleY);
   drawCenteredWrappedTextAt(ch.desc, textCenterX, roleY + roleLineH, textAreaW, '12px monospace', descColor, descLineH, 2);
 }
 
@@ -1928,6 +2069,7 @@ function renderWorld() {
   platforms.forEach((p, i) => { if (p.isPlanet) drawPlanet(p, i); else drawPlatform(p, i); });
   drawLemons();
   drawObstacles();
+  drawHazards();
   if (state === 'slingshot') drawSlingshotRig();
   if (state !== 'exploding' && state !== 'lose') drawRocket();
   if (state === 'slingshot') drawSlingshotUI();
