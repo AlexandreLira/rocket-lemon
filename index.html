@@ -725,10 +725,22 @@ const audio = {
     if (!this.victorySong) {
       this.victorySong = new Audio('assets/we-are-the-champions.mp3');
       this.victorySong.volume = 0.7;
+      this.victorySong.preload = 'auto';
     }
     this.victorySong.muted = this.muted;
-    this.victorySong.currentTime = 58; // pula direto pro refrão "We are the champions"
-    this.victorySong.play().catch(() => {});
+    const CHORUS_START = 58; // pula direto pro refrão "We are the champions"
+    const startAtChorus = () => {
+      try { this.victorySong.currentTime = CHORUS_START; } catch (e) {}
+      this.victorySong.play().catch(() => {});
+    };
+    // só dá pra buscar o segundo 58 depois dos metadados carregarem; se ainda
+    // não carregaram, o seek é ignorado e a música começa do início
+    if (this.victorySong.readyState >= 1) {
+      startAtChorus();
+    } else {
+      this.victorySong.addEventListener('loadedmetadata', startAtChorus, { once: true });
+      this.victorySong.load();
+    }
   },
 
   stopVictorySong() {
