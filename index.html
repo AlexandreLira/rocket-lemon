@@ -546,6 +546,17 @@ const audio = {
     this.blip(79, 0.09, 0.16, 0.14);
   },
 
+  sfxCountdownTick() {
+    // bip curto e grave a cada segundo da contagem regressiva
+    this.blip(69, 0, 0.14, 0.18);
+  },
+
+  sfxCountdownGo() {
+    // tom mais agudo e longo no "vai!" (fim da contagem)
+    this.blip(81, 0, 0.28, 0.2);
+    this.blip(88, 0.12, 0.3, 0.16);
+  },
+
   sfxPickup() {
     this.blip(88, 0, 0.07, 0.13);
     this.blip(95, 0.06, 0.12, 0.13);
@@ -1613,6 +1624,7 @@ function startGame(diffKey, isRetry) {
   countdownLabel = 'DECOLAGEM EM...';
   resumeTimer = 3;
   state = 'resuming';
+  audio.sfxCountdownTick(); // bip do primeiro número
   addToast(CHARACTERS[currentCharacter].startToast);
   addToast(isMobile ? 'SEGURE A TELA PARA DECOLAR' : 'PRESSIONE ↑ PARA DECOLAR');
 }
@@ -2085,8 +2097,11 @@ function update(dt) {
     updateParticles(dt);
   } else if (state === 'resuming') {
     // jogo congelado durante a contagem regressiva antes de retomar
+    const before = Math.ceil(resumeTimer);
     resumeTimer -= dt;
-    if (resumeTimer <= 0) state = stateBeforePause;
+    const after = Math.ceil(resumeTimer);
+    if (after < before && after >= 1) audio.sfxCountdownTick();
+    if (resumeTimer <= 0) { audio.sfxCountdownGo(); state = stateBeforePause; }
   }
 
   if (state === 'playing' || state === 'slingshot' || state === 'exploding' || state === 'win' || state === 'lose') {
@@ -2270,6 +2285,84 @@ function drawGround() {
   ctx.fillStyle = '#41e0d0';
   ctx.fillRect(W / 2 - 40, groundY - 4, 80, 3);
   ctx.shadowBlur = 0;
+  // estruturas da base de lançamento
+  drawLaunchTower(groundY);
+  drawFuelTank(groundY);
+}
+
+// torre de serviço (gantry) treliçada à direita do pad
+function drawLaunchTower(groundY) {
+  const towerH = 108;
+  const topY = groundY - towerH;
+  const legBotL = W / 2 + 48, legBotR = W / 2 + 78;
+  const legTopL = W / 2 + 54, legTopR = W / 2 + 72;
+  ctx.save();
+  ctx.strokeStyle = '#6b7488';
+  ctx.lineWidth = 2;
+  // pernas afuniladas
+  ctx.beginPath();
+  ctx.moveTo(legBotL, groundY); ctx.lineTo(legTopL, topY);
+  ctx.moveTo(legBotR, groundY); ctx.lineTo(legTopR, topY);
+  ctx.stroke();
+  // travessas + diagonais (treliça)
+  const rungs = 7;
+  for (let i = 0; i <= rungs; i++) {
+    const t = i / rungs, t2 = (i + 1) / rungs;
+    const y = groundY + (topY - groundY) * t;
+    const xl = legBotL + (legTopL - legBotL) * t;
+    const xr = legBotR + (legTopR - legBotR) * t;
+    ctx.beginPath(); ctx.moveTo(xl, y); ctx.lineTo(xr, y); ctx.stroke();
+    if (i < rungs) {
+      const y2 = groundY + (topY - groundY) * t2;
+      const xl2 = legBotL + (legTopL - legBotL) * t2;
+      const xr2 = legBotR + (legTopR - legBotR) * t2;
+      ctx.beginPath();
+      if (i % 2 === 0) { ctx.moveTo(xl, y); ctx.lineTo(xr2, y2); }
+      else { ctx.moveTo(xr, y); ctx.lineTo(xl2, y2); }
+      ctx.stroke();
+    }
+  }
+  // braço de serviço apontando para o foguete
+  const armY = topY + 18;
+  ctx.strokeStyle = '#7d8698';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(legTopL, armY);
+  ctx.lineTo(W / 2 + 14, armY);
+  ctx.stroke();
+  // plataforma no topo
+  ctx.fillStyle = '#39404f';
+  ctx.fillRect(legTopL - 3, topY - 4, (legTopR - legTopL) + 6, 5);
+  // farol vermelho piscando
+  const beaconOn = Math.floor(time * 2) % 2 === 0;
+  if (beaconOn) { ctx.shadowColor = '#ff5b5b'; ctx.shadowBlur = 8; }
+  ctx.fillStyle = beaconOn ? '#ff5b5b' : '#5a1f1f';
+  ctx.fillRect((legTopL + legTopR) / 2 - 2, topY - 9, 4, 4);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+// tanque de combustível à esquerda do pad
+function drawFuelTank(groundY) {
+  const tankX = W / 2 - 92, tankW = 26, tankH = 40;
+  ctx.save();
+  ctx.fillStyle = '#c9cdd6';
+  roundRect(tankX, groundY - tankH, tankW, tankH, 8);
+  ctx.fill();
+  ctx.fillStyle = '#9aa1ae';
+  ctx.fillRect(tankX, groundY - tankH * 0.55, tankW, 3);
+  ctx.fillRect(tankX, groundY - tankH * 0.3, tankW, 3);
+  // faixa de aviso
+  ctx.fillStyle = '#ffd166';
+  ctx.fillRect(tankX, groundY - tankH - 4, tankW, 4);
+  // cano ligando ao pad
+  ctx.strokeStyle = '#7d8698';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(tankX + tankW, groundY - 8);
+  ctx.lineTo(W / 2 - 40, groundY - 8);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawBigMoon() {
@@ -2666,6 +2759,18 @@ function drawHUD() {
     ctx.fillText(distance + 'm', ax, 108);
   }
   ctx.textAlign = 'left';
+
+  // atalhos durante o jogo (rodapé)
+  if (state === 'playing' || state === 'resuming') {
+    ctx.font = 'bold 10px monospace';
+    ctx.fillStyle = 'rgba(143,163,200,0.7)';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      isMobile ? 'INCLINE PARA GIRAR · SEGURE PARA EMPUXO' : '←/→ GIRAR · ↑ EMPUXO · ESC PAUSA · M SOM',
+      W / 2, H - 14
+    );
+    ctx.textAlign = 'left';
+  }
 }
 
 function drawToasts() {
@@ -2766,7 +2871,7 @@ function renderTitle() {
   drawBackground(time * 12);
   drawCenteredText([
     ['ROCKET', 160, 52, '#f4f6fb', true],
-    ['LEMON', 220, 52, '#ffd166', true],
+    ['LEMON', 220, 52, '#8fd94a', true],
     ['DECOLE ATÉ A LUA', 258, 14, '#cfe3ff'],
   ]);
   ctx.save();
@@ -2786,7 +2891,7 @@ function renderTitle() {
     drawCenteredText([[isMobile ? 'TOQUE PARA COMEÇAR' : 'CLIQUE OU ENTER PARA COMEÇAR', 560, 16, '#ffffff', true]]);
   }
   drawCenteredText([
-    [isMobile ? 'INCLINE O CELULAR - SEGURE PARA EMPUXO' : '←/→ GIRAR - ↑ EMPUXO - M SOM', 640, 11, '#8892a6'],
+    [isMobile ? 'INCLINE O CELULAR - SEGURE PARA EMPUXO' : '←/→ GIRAR - ↑ EMPUXO - ESC PAUSA - M SOM', 640, 11, '#8892a6'],
     ['PEGUE CADA LIMÃO. POUSE SUAVEMENTE NA LUA.', 662, 11, '#8892a6'],
   ]);
   ctx.font = 'bold 11px monospace';
@@ -3173,6 +3278,7 @@ window.addEventListener('keydown', (e) => {
       countdownLabel = 'RETOMANDO EM...';
       resumeTimer = 2;
       state = 'resuming';
+      audio.sfxCountdownTick();
     }
   }
 
@@ -3244,6 +3350,7 @@ function handleMenuTap(x, y) {
     countdownLabel = 'RETOMANDO EM...';
     resumeTimer = 2;
     state = 'resuming';
+    audio.sfxCountdownTick();
   }
 }
 
