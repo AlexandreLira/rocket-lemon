@@ -21,6 +21,7 @@
     max-width: 100vw;
     max-height: 100vh;
     box-shadow: 0 0 60px rgba(80, 110, 255, 0.15);
+    cursor: pointer;
   }
 </style>
 </head>
@@ -1353,7 +1354,7 @@ function renderShop() {
   drawCenteredText([[
     isMobile
       ? 'TOQUE PARA SELECIONAR · TOQUE DE NOVO OU NO BOTÃO PARA COMPRAR/EQUIPAR · VOLTAR'
-      : '←/→ ITENS · Q/E ABAS · ENTER AÇÃO · ESC VOLTAR · BACKSPACE TÍTULO',
+      : 'CLIQUE NOS ITENS · Q/E ABAS · ENTER AÇÃO · ESC VOLTAR · BACKSPACE TÍTULO',
     688, 11, '#8892a6',
   ]]);
   drawToasts();
@@ -2754,7 +2755,7 @@ function renderTitle() {
   ctx.drawImage(flame, -15, 46, 30, 24);
   ctx.restore();
   if (Math.floor(time * 2) % 2 === 0) {
-    drawCenteredText([[isMobile ? 'TOQUE PARA COMEÇAR' : 'PRESSIONE ENTER PARA COMEÇAR', 560, 16, '#ffffff', true]]);
+    drawCenteredText([[isMobile ? 'TOQUE PARA COMEÇAR' : 'CLIQUE OU ENTER PARA COMEÇAR', 560, 16, '#ffffff', true]]);
   }
   drawCenteredText([
     [isMobile ? 'INCLINE O CELULAR - SEGURE PARA EMPUXO' : '←/→ GIRAR - ↑ EMPUXO - M SOM', 640, 11, '#8892a6'],
@@ -2914,13 +2915,13 @@ function renderCharacterMenu() {
   drawCenteredText([['ESCOLHA O PILOTO', 115, 28, '#ffd166', true]]);
   CHAR_KEYS.forEach((key, i) => drawCharacterCard(key, layout.cardRect(i), i === menuIndex));
   drawCenteredText([[
-    isMobile ? 'TOQUE NO PILOTO · TOQUE LOJA NO CANTO' : '↑/↓/←/→ SELECIONAR - 1-4 ATALHO - ENTER CONTINUAR - ESC LOJA - BACKSPACE TÍTULO',
+    isMobile ? 'TOQUE NO PILOTO · TOQUE LOJA NO CANTO' : 'CLIQUE NO PILOTO · ↑/↓/←/→ SELECIONAR · ENTER CONTINUAR · L LOJA · ESC VOLTAR',
     680, 11, '#8892a6',
   ]]);
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = '#ffd166';
   ctx.textAlign = 'right';
-  ctx.fillText('LOJA (ESC)', W - 48, 100);
+  ctx.fillText('LOJA (L)', W - 48, 100);
   ctx.textAlign = 'left';
   drawVignette();
 }
@@ -2945,7 +2946,7 @@ function renderMenu() {
       [diff.desc, y + 24, 11, selected ? '#cfe3ff' : '#5a6478'],
     ]);
   });
-  drawCenteredText([[isMobile ? 'TOQUE PARA DECOLAR' : '↑/↓ SELECIONAR - ENTER DECOLAR - ESC VOLTAR', 620, 11, '#8892a6']]);
+  drawCenteredText([[isMobile ? 'TOQUE PARA DECOLAR' : 'CLIQUE OU ↑/↓ SELECIONAR · ENTER DECOLAR · ESC VOLTAR', 620, 11, '#8892a6']]);
   drawVignette();
 }
 
@@ -2991,7 +2992,7 @@ function renderWorld() {
       ['NA LUA!', 186, 30, '#ffd166', true],
       ['TENTATIVAS: ' + attempts, 228, 14, '#cfe3ff'],
       ['MOEDAS: ' + wallet.coins, 252, 14, '#ffd166'],
-      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'R REPETIR - ENTER MENU', 284, 13, '#ffffff'],
+      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'CLIQUE: REPETIR · METADE DE BAIXO: MENU · R / ENTER', 284, 13, '#ffffff'],
     ]);
   } else if (state === 'lose') {
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -3015,7 +3016,7 @@ function renderWorld() {
       [crashReason, reasonY, 11, '#8fa3c8'],
       ['TENTATIVA ' + attempts, reasonY + 26, 13, '#8fa3c8'],
       ['MOEDAS: ' + wallet.coins, reasonY + 46, 13, '#ffd166'],
-      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'R REPETIR - ENTER MENU', reasonY + 74, 13, '#ffffff'],
+      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'CLIQUE: REPETIR · METADE DE BAIXO: MENU · R / ENTER', reasonY + 74, 13, '#ffffff'],
     ]);
   }
 }
@@ -3076,8 +3077,8 @@ window.addEventListener('keydown', (e) => {
       currentCharacter = CHAR_KEYS[menuIndex];
       state = 'difficulty';
       menuIndex = 0;
-    } else if (e.key === 'Escape') { openShop('character'); }
-    else if (e.key === 'Backspace') { state = 'title'; }
+    } else if (e.key === 'l' || e.key === 'L') { openShop('character'); }
+    else if (e.key === 'Escape' || e.key === 'Backspace') { state = 'title'; }
   } else if (state === 'shop') {
     const keys = getShopItemKeys();
     const cols = getShopLayout().cols;
@@ -3229,6 +3230,13 @@ canvas.addEventListener('touchcancel', (e) => {
   if (state === 'playing' && e.touches.length === 0) keys.up = false;
   touchStart = null;
 }, { passive: false });
+
+canvas.addEventListener('click', (e) => {
+  if (state === 'playing' || state === 'slingshot') return;
+  audio.init();
+  const m = canvasPos(e);
+  handleMenuTap(m.x, m.y);
+});
 
 canvas.addEventListener('pointerdown', (e) => {
   if (state !== 'slingshot') return;

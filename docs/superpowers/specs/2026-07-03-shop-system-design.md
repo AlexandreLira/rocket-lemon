@@ -10,7 +10,7 @@
 
 ## Resumo
 
-A F2 transforma moedas coletadas em cosméticos visuais: **skins de nave**, **trilhas de partículas** e **acessórios**. A loja é acessível na tela inicial (botão LOJA / tecla `L`) e no menu de personagem (`Esc`). Itens são comprados com saldo persistente e equipados por categoria.
+A F2 transforma moedas coletadas em cosméticos visuais: **skins de nave**, **trilhas de partículas** e **acessórios**. A loja é acessível na tela inicial (botão LOJA / tecla `L`) e no menu de personagem (tecla `L`). Itens são comprados com saldo persistente e equipados por categoria.
 
 **Arquivo principal:** [`index.html`](../../../index.html)
 
@@ -55,7 +55,7 @@ Migração automática v1→v2 em `loadSave()`, preservando `coins` e `totalEarn
 ## Navegação
 
 - **Title:** botão LOJA ou tecla `L` → shop (`shopReturnState = 'title'`)
-- **Character:** `Esc` → shop; `Backspace` ou clique `← TÍTULO` → title
+- **Character:** tecla `L` → shop; `Esc` / `Backspace` ou clique `← TÍTULO` → title
 - **Shop (teclado):** `Esc` volta ao estado anterior; `Q`/`E` trocam abas; setas navegam grid; `Enter` compra/equipa; `Backspace` vai ao title
 - **Shop (toque):** 1º toque no card seleciona (preview); 2º toque no mesmo card ou no botão de ação confirma; `← VOLTAR` sai para `shopReturnState` (igual a `Esc`)
 - **Botão de ação:** `EQUIPADO` (verde), `EQUIPAR` (amarelo), `COMPRAR (N)` (amarelo), ou `FALTAM X` (cinza, sem saldo)
