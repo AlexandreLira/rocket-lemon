@@ -8,10 +8,11 @@ Sem dependências, sem build — basta abrir no navegador.
 
 1. Abra `index.html` no navegador (Chrome, Firefox ou Safari recomendados).
 2. Pressione **Enter** na tela inicial.
-3. Escolha a dificuldade (**Easy**, **Medium** ou **Hard**).
-4. Decole da Terra com **↑**, navegue pelas plataformas e colete todos os limões.
-5. Pouso suave no **planeta** final para entrar no modo estilingue.
-6. Arremesse o foguete e **acerte a Lua** para vencer.
+3. Escolha um **piloto** (Alex, Tabata, Kaique ou Weslley).
+4. Escolha a dificuldade (**Easy**, **Medium** ou **Hard**).
+5. Decole da Terra com **↑**, navegue pelas plataformas e colete todos os limões.
+6. Pouso suave no **planeta** final para entrar no modo estilingue.
+7. Arremesse o foguete e **acerte a Lua** para vencer.
 
 ## Objetivo
 
@@ -36,9 +37,19 @@ Sem dependências, sem build — basta abrir no navegador.
 |-------|------|
 | **Enter / Espaço** | Confirmar / iniciar |
 | **Esc** | Voltar |
-| **↑ / ↓** | Selecionar dificuldade |
-| **1 / 2 / 3** | Atalho Easy / Medium / Hard |
+| **↑ / ↓** | Selecionar piloto ou dificuldade |
+| **1 / 2 / 3 / 4** | Atalho para piloto (Alex / Tabata / Kaique / Weslley) |
+| **1 / 2 / 3** | Atalho Easy / Medium / Hard (tela de dificuldade) |
 | **R** | Tentar novamente (após vitória ou derrota) |
+
+### Pilotos
+
+| Piloto | Área | Bônus |
+|--------|------|-------|
+| Alex "git push --force" Lira | Dev | Rotação +20% |
+| Tabata "Isso É Feature" Ruiz | Dev | Auto-estabilização +35% |
+| Kaique "Só Mais Um Limão" Costa | Produto | Combustível 120, limão +70 |
+| Weslley "Fora Do Intervalo" Araujo | Dados | HUD estendido (ângulo, %, margens de pouso) |
 
 ### Modo estilingue
 
@@ -125,13 +136,31 @@ No modo estilingue:
 - **Web Audio API** — música procedural, ruído de motor e efeitos sonoros
 - **JavaScript vanilla** — física, geração de mundo e game loop
 
-Sprites gerados em runtime a partir de matrizes de caracteres; nenhuma imagem externa é necessária.
+Sprites gerados em runtime a partir de matrizes de caracteres. Avatares dos pilotos são PNGs pixel em `assets/avatars/` (gerados a partir das fotos em `assets/`).
+
+## Assets
+
+| Pasta | Conteúdo |
+|-------|----------|
+| `assets/` | Fotos originais dos pilotos |
+| `assets/avatars/` | Sprites pixel 32×32 usados no menu e no HUD |
+
+Para regenerar os avatares após trocar uma foto:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install Pillow
+node scripts/generate-avatars.mjs
+```
 
 ## Estrutura do projeto
 
 ```
 jogo/
-├── index.html    # Jogo completo (HTML + CSS + JS)
+├── index.html           # Jogo completo (HTML + CSS + JS)
+├── assets/              # Fotos dos pilotos
+│   └── avatars/         # Avatares pixel (32×32)
+├── scripts/             # generate-avatars.mjs, pixelify.py
 ├── .gitignore
 └── README.md
 ```
@@ -141,7 +170,7 @@ jogo/
 Para testes automatizados, o jogo expõe `window.__rl` no console:
 
 ```js
-__rl.state              // 'title' | 'difficulty' | 'playing' | 'slingshot' | 'exploding' | 'win' | 'lose'
+__rl.state              // 'title' | 'character' | 'difficulty' | 'playing' | ...
 __rl.rocket             // posição, velocidade, ângulo, combustível
 __rl.platforms          // plataformas e planeta gerados
 __rl.obstacles          // obstáculos ativos

@@ -70,6 +70,7 @@ const CHARACTERS = {
     desc: 'QUEBROU PROD TRES VEZES HOJE. MESMO ASSIM CONFIA NO EMPUXO.',
     bonus: 'ROTATION +20%',
     startToast: 'DEPLOYING TO PROD...',
+    avatar: 'assets/avatars/alexandre.png',
     stats: { rotationMult: 1.2 },
   },
   tabata: {
@@ -79,6 +80,7 @@ const CHARACTERS = {
     desc: 'TRANSFORMA CRASH EM SPRINT. SE CAIU, VIROU RETRO.',
     bonus: 'AUTO-STABILIZE +35%',
     startToast: 'IF IT CRASHES, IT IS A RETRO',
+    avatar: 'assets/avatars/tabata.png',
     stats: { stabilizeMult: 1.35 },
   },
   kaique: {
@@ -88,6 +90,7 @@ const CHARACTERS = {
     desc: 'O ROADMAP NAO PARA NO MVP. QUER TODOS OS LIMAOES.',
     bonus: 'FUEL 120 / LEMON +70',
     startToast: 'COLETANDO TODOS OS LIMAOES',
+    avatar: 'assets/avatars/kaique.png',
     stats: { fuelMax: 120, refuelAmount: 70 },
   },
   weslley: {
@@ -97,6 +100,7 @@ const CHARACTERS = {
     desc: 'PREVIU 99% DE CHANCE DE EXPLOSAO. VOCE ESTA NO 1%.',
     bonus: 'EXTENDED HUD',
     startToast: 'PROBABILIDADE: 1% DE SUCESSO',
+    avatar: 'assets/avatars/weslley.png',
     stats: { extendedHud: true },
   },
 };
@@ -428,6 +432,9 @@ let state = 'title'; // title | character | difficulty | playing | slingshot | e
 let menuIndex = 0;
 let currentDiff = 'easy';
 let currentCharacter = 'alexandre';
+
+const avatarSprites = {};
+let avatarsReady = false;
 let attempts = 1;
 let time = 0;
 let camY = -60;
@@ -961,6 +968,51 @@ function drawSpriteCentered(sprite, x, y, scale, alpha) {
   ctx.globalAlpha = 1;
 }
 
+function roleBadge(role) {
+  if (role === 'PRODUTO') return 'P';
+  if (role === 'DADOS') return 'A';
+  return 'D';
+}
+
+function loadAvatars() {
+  return Promise.all(CHAR_KEYS.map(key => new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => { avatarSprites[key] = img; resolve(); };
+    img.onerror = () => resolve();
+    img.src = CHARACTERS[key].avatar;
+  }))).then(() => { avatarsReady = true; });
+}
+
+function drawPixelAvatar(key, x, y, size, highlight) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  if (highlight) {
+    ctx.shadowColor = 'rgba(255,209,102,0.55)';
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = 'rgba(255,209,102,0.85)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 1, y - 1, size + 2, size + 2);
+    ctx.shadowBlur = 0;
+  }
+  const img = avatarSprites[key];
+  if (img) {
+    ctx.drawImage(img, x, y, size, size);
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(x, y, size, size);
+    ctx.strokeStyle = 'rgba(120,160,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, size, size);
+    ctx.font = 'bold ' + Math.round(size * 0.45) + 'px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#8fa3c8';
+    ctx.fillText(roleBadge(CHARACTERS[key].role), x + size / 2, y + size / 2);
+  }
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+
 function drawBackground(camPos) {
   const progress = Math.max(0, Math.min(1, camPos / Math.max(1, worldTop - H)));
   const top = lerpColor('#0d1330', '#04030c', progress);
@@ -1343,18 +1395,20 @@ function drawHUD() {
     ctx.fillText('ANG' + (angOk ? '\u2713' : '\u2717'), 255, 74);
   }
 
-  // progress + attempts
+  // progress + attempts + pilot avatar
+  const hudRight = W - 88;
+  drawPixelAvatar(currentCharacter, W - 36, 14, 24, false);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#cfe3ff';
   const total = platforms.length - 1;
   const progressText = slingScene ? 'TARGET: MOON'
     : (target.isPlanet ? 'TARGET: PLANET' : 'PAD ' + (targetIndex + 1) + '/' + total);
-  ctx.fillText(progressText, W - 20, 26);
+  ctx.fillText(progressText, hudRight, 26);
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('ATTEMPT ' + attempts, W - 20, 42);
-  ctx.fillText(CHARACTERS[currentCharacter].shortName, W - 20, 58);
+  ctx.fillText('ATTEMPT ' + attempts, hudRight, 42);
+  ctx.fillText(CHARACTERS[currentCharacter].shortName, hudRight, 58);
   if (activeStats.extendedHud) {
-    ctx.fillText(DIFFICULTIES[currentDiff].label, W - 20, 74);
+    ctx.fillText(DIFFICULTIES[currentDiff].label, hudRight, 74);
   }
 
   // offscreen target arrow
@@ -1406,6 +1460,47 @@ function drawCenteredText(lines) {
   ctx.textAlign = 'left';
 }
 
+function wrapTextLines(text, maxWidth, font) {
+  ctx.font = font;
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function truncateText(text, maxWidth, font) {
+  ctx.font = font;
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let trimmed = text;
+  while (trimmed.length > 0 && ctx.measureText(trimmed + '...').width > maxWidth) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  return trimmed + '...';
+}
+
+function drawWrappedText(text, x, y, maxWidth, font, color, lineHeight, maxLines) {
+  let lines = wrapTextLines(text, maxWidth, font);
+  if (maxLines && lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    lines[maxLines - 1] = truncateText(lines[maxLines - 1], maxWidth, font);
+  }
+  ctx.font = font;
+  ctx.fillStyle = color;
+  ctx.textAlign = 'left';
+  lines.forEach((line, i) => ctx.fillText(line, x, y + i * lineHeight));
+  return lines.length;
+}
+
 function renderTitle() {
   drawBackground(time * 12);
   drawCenteredText([
@@ -1430,27 +1525,43 @@ function renderTitle() {
 }
 
 function renderCharacterMenu() {
+  const cardX = 70;
+  const cardW = W - 140;
+  const cardH = 84;
+  const cardGap = 96;
+  const cardTop = 188;
+  const textX = cardX + 62;
+  const textW = cardW - 72;
+
   drawBackground(time * 12);
   drawCenteredText([['SELECT PILOT', 130, 24, '#ffd166', true]]);
   CHAR_KEYS.forEach((key, i) => {
     const ch = CHARACTERS[key];
-    const y = 210 + i * 68;
+    const top = cardTop + i * cardGap;
     const selected = i === menuIndex;
     if (selected) {
       ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      roundRect(70, y - 22, W - 140, 58, 10);
+      roundRect(cardX, top, cardW, cardH, 10);
       ctx.fill();
       ctx.strokeStyle = 'rgba(255,209,102,0.4)';
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    drawCenteredText([
-      [ch.label, y, 13, selected ? '#ffffff' : '#8892a6', selected],
-      [ch.role + ' - ' + ch.bonus, y + 16, 10, selected ? '#ffd166' : '#5a6478'],
-      [ch.desc, y + 30, 9, selected ? '#cfe3ff' : '#5a6478'],
-    ]);
+    drawPixelAvatar(key, cardX + 12, top + 22, 40, selected);
+    const nameColor = selected ? '#ffffff' : '#8892a6';
+    const roleColor = selected ? '#ffd166' : '#5a6478';
+    const descColor = selected ? '#cfe3ff' : '#5a6478';
+    const nameFont = selected ? 'bold 12px monospace' : '12px monospace';
+    const nameLineH = 14;
+    const nameLines = drawWrappedText(ch.label, textX, top + 16, textW, nameFont, nameColor, nameLineH, 2);
+    const roleY = top + 16 + nameLines * nameLineH + 2;
+    ctx.font = '10px monospace';
+    ctx.fillStyle = roleColor;
+    ctx.textAlign = 'left';
+    ctx.fillText(truncateText(ch.role + ' - ' + ch.bonus, textW, '10px monospace'), textX, roleY);
+    drawWrappedText(ch.desc, textX, roleY + 13, textW, '10px monospace', descColor, 12, 2);
   });
-  drawCenteredText([['UP/DOWN SELECT - 1-4 SHORTCUT - ENTER CONTINUE - ESC BACK', 660, 10, '#8892a6']]);
+  drawCenteredText([['UP/DOWN SELECT - 1-4 SHORTCUT - ENTER CONTINUE - ESC BACK', 680, 10, '#8892a6']]);
   drawVignette();
 }
 
@@ -1639,6 +1750,7 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+loadAvatars();
 
 // debug/test hooks
 window.__rl = {
