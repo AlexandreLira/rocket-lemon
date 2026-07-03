@@ -2,27 +2,41 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Rocket Lemon</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <style>
+  :root {
+    --aw: 1180;
+    --ah: 720;
+  }
   html, body {
     margin: 0;
     padding: 0;
+    padding:
+      env(safe-area-inset-top)
+      env(safe-area-inset-right)
+      env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
     background: #05060f;
     height: 100%;
+    height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    touch-action: none;
   }
-  canvas {
+  #game {
+    width: min(100vw, 100dvh * (var(--aw) / var(--ah)));
+    height: min(100dvh, 100vw * (var(--ah) / var(--aw)));
+    max-width: 100%;
+    max-height: 100%;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    max-width: 100vw;
-    max-height: 100vh;
     box-shadow: 0 0 60px rgba(80, 110, 255, 0.15);
     cursor: pointer;
+    touch-action: none;
   }
 </style>
 </head>
@@ -31,8 +45,27 @@
 <script>
 'use strict';
 
-const W = 1180;
-const H = 720;
+const isMobile = matchMedia('(pointer: coarse)').matches;
+const isPortraitMobile = isMobile && matchMedia('(orientation: portrait)').matches;
+let W = isPortraitMobile ? 720 : 1180;
+let H = isPortraitMobile ? 1280 : 720;
+
+function fitDisplay() {
+  document.documentElement.style.setProperty('--aw', String(W));
+  document.documentElement.style.setProperty('--ah', String(H));
+}
+
+function uiPad() {
+  return {
+    margin: Math.max(24, Math.round(W * 0.04)),
+    topBar: Math.max(88, Math.round(H * 0.07)),
+    hintY: H - Math.max(40, Math.round(H * 0.04)),
+    safeTop: isPortraitMobile ? 16 : 0,
+    safeBottom: isPortraitMobile ? 24 : 0,
+  };
+}
+
+fitDisplay();
 
 const CONFIG = {
   gravity: 36,
@@ -752,8 +785,12 @@ const audio = {
 // ---------------------------------------------------------------- state
 
 const canvas = document.getElementById('game');
+canvas.width = W;
+canvas.height = H;
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+window.addEventListener('resize', fitDisplay);
+window.addEventListener('orientationchange', fitDisplay);
 
 let state = 'title'; // title | character | difficulty | shop | playing | paused | resuming | slingshot | exploding | win | lose
 let stateBeforePause = 'playing'; // estado retomado após a contagem regressiva
@@ -833,7 +870,6 @@ const MOON_RADIUS = 300;
 
 const rocket = { x: W / 2, y: CONFIG.rocketHalfHeight, vx: 0, vy: 0, angle: 0, fuel: CONFIG.fuelMax, landed: true };
 const keys = { left: false, right: false, up: false, down: false };
-const isMobile = matchMedia('(pointer: coarse)').matches;
 let tiltEnabled = false;
 let neutralGamma = null;
 let smoothGamma = null;
@@ -1062,6 +1098,29 @@ function shopGridNav(key, index, count, cols) {
 }
 
 function getShopLayout() {
+  const pad = uiPad();
+  if (isPortraitMobile) {
+    const listY = pad.topBar + 40;
+    const previewH = Math.round(H * 0.26);
+    const hintReserve = 36;
+    const listH = H - listY - previewH - pad.safeBottom - hintReserve - 8;
+    return {
+      tabY: pad.topBar,
+      listX: pad.margin,
+      listY,
+      listW: W - pad.margin * 2,
+      listH,
+      previewX: pad.margin,
+      previewY: listY + listH + 8,
+      previewW: W - pad.margin * 2,
+      previewH,
+      cols: 1,
+      cardH: 88,
+      gap: 12,
+      titleY: pad.safeTop + 28,
+      hintY: H - pad.safeBottom - 12,
+    };
+  }
   return {
     tabY: 68,
     listX: 48,
@@ -1075,7 +1134,20 @@ function getShopLayout() {
     cols: 2,
     cardH: 96,
     gap: 14,
+    titleY: 42,
+    hintY: 688,
   };
+}
+
+function getShopTabMetrics() {
+  const pad = uiPad();
+  const tabW = isPortraitMobile
+    ? Math.floor((W - pad.margin * 2) / 3)
+    : 160;
+  const tabStartX = isPortraitMobile
+    ? pad.margin
+    : (W - tabW * 3) / 2;
+  return { tabW, tabStartX };
 }
 
 function shopCardRect(i) {
@@ -1208,12 +1280,76 @@ function drawShopItemCard(category, id, rect, selected) {
   }
 }
 
+function getTitleLayout() {
+  const pad = uiPad();
+  if (isPortraitMobile) {
+    return {
+      titleY1: Math.round(H * 0.12),
+      titleY2: Math.round(H * 0.17),
+      subtitleY: Math.round(H * 0.20),
+      rocketY: Math.round(H * 0.45),
+      ctaY: Math.round(H * 0.72),
+      hint1Y: Math.round(H * 0.82),
+      hint2Y: Math.round(H * 0.85),
+      coinsY: H - pad.safeBottom - 24,
+    };
+  }
+  return {
+    titleY1: 160,
+    titleY2: 220,
+    subtitleY: 258,
+    rocketY: 400,
+    ctaY: 560,
+    hint1Y: 640,
+    hint2Y: 662,
+    coinsY: H - 24,
+  };
+}
+
 function getTitleShopButtonRect() {
-  return { x: 130, y: H - 36, w: 80, h: 28 };
+  const pad = uiPad();
+  return { x: 130, y: H - pad.safeBottom - 36, w: 80, h: 28 };
 }
 
 function getShopBackButtonRect() {
+  const pad = uiPad();
+  if (isPortraitMobile) {
+    return { x: pad.margin, y: pad.topBar - 12, w: 100, h: 24 };
+  }
   return { x: 48, y: 88, w: 100, h: 24 };
+}
+
+function getCharacterBackRect() {
+  const pad = uiPad();
+  if (isPortraitMobile) {
+    return { x: pad.margin, y: pad.topBar - 12, w: 100, h: 24 };
+  }
+  return { x: 48, y: 88, w: 92, h: 24 };
+}
+
+function getCharacterShopRect() {
+  const pad = uiPad();
+  if (isPortraitMobile) {
+    return { x: W - pad.margin - 112, y: pad.topBar - 12, w: 112, h: 24 };
+  }
+  return { x: W - 160, y: 88, w: 112, h: 24 };
+}
+
+function getDifficultyLayout() {
+  const pad = uiPad();
+  const spacing = isPortraitMobile ? Math.round(H * 0.09) : 90;
+  const startY = isPortraitMobile ? Math.round(H * 0.35) : 260;
+  return {
+    titleY: isPortraitMobile ? Math.round(H * 0.12) : 150,
+    startY,
+    spacing,
+    hintY: pad.hintY,
+    rowY(i) { return startY + i * spacing; },
+    hitRect(i) {
+      const cy = startY + i * spacing;
+      return { x: 90, y: cy - 26, w: W - 180, h: 66 };
+    },
+  };
 }
 
 function shopActionButtonRect() {
@@ -1252,8 +1388,7 @@ function handleShopTap(x, y) {
   }
 
   const layout = getShopLayout();
-  const tabW = 160;
-  const tabStartX = (W - tabW * 3) / 2;
+  const { tabW, tabStartX } = getShopTabMetrics();
   for (let t = 0; t < 3; t++) {
     const tx = tabStartX + t * tabW;
     if (x >= tx && x <= tx + tabW - 8 && y >= layout.tabY - 20 && y <= layout.tabY + 8) {
@@ -1282,28 +1417,30 @@ function handleShopTap(x, y) {
 function renderShop() {
   drawBackground(time * 12);
   const layout = getShopLayout();
+  const pad = uiPad();
+  const back = getShopBackButtonRect();
   const category = SHOP_CATEGORIES[shopTab];
   const selectedId = getShopSelectedId();
   const selectedItem = SHOP_CATALOGS[category][selectedId];
 
-  ctx.font = 'bold 22px monospace';
+  ctx.font = isPortraitMobile ? 'bold 16px monospace' : 'bold 22px monospace';
   ctx.fillStyle = '#ffd166';
   ctx.textAlign = 'left';
-  ctx.fillText('LOJA DE ACESSÓRIOS', 48, 42);
+  ctx.fillText(isPortraitMobile ? 'LOJA' : 'LOJA DE ACESSÓRIOS', pad.margin, layout.titleY);
   ctx.font = 'bold 12px monospace';
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('MOEDAS:', W - 180, 42);
-  ctx.drawImage(SPRITES.coin, W - 110, 30, 14, 14);
+  const coinsLabelX = W - pad.margin - 130;
+  ctx.fillText('MOEDAS:', coinsLabelX, layout.titleY);
+  ctx.drawImage(SPRITES.coin, coinsLabelX + 70, layout.titleY - 12, 14, 14);
   ctx.fillStyle = '#ffd166';
-  ctx.fillText(String(wallet.coins), W - 92, 42);
+  ctx.fillText(String(wallet.coins), coinsLabelX + 88, layout.titleY);
   ctx.textAlign = 'left';
 
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = '#8892a6';
-  ctx.fillText('← VOLTAR', 48, 100);
+  ctx.fillText('← VOLTAR', back.x, back.y + 12);
 
-  const tabW = 160;
-  const tabStartX = (W - tabW * 3) / 2;
+  const { tabW, tabStartX } = getShopTabMetrics();
   for (let t = 0; t < 3; t++) {
     const tx = tabStartX + t * tabW;
     const active = t === shopTab;
@@ -1332,20 +1469,26 @@ function renderShop() {
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  const previewCx = layout.previewX + layout.previewW / 2;
+  const rocketScale = isPortraitMobile ? 2 : 3;
+  const rocketY = layout.previewY + Math.round(layout.previewH * (isPortraitMobile ? 0.32 : 0.38));
+  const labelY = layout.previewY + Math.round(layout.previewH * (isPortraitMobile ? 0.52 : 0.62));
+  const descY = layout.previewY + Math.round(layout.previewH * (isPortraitMobile ? 0.58 : 0.66));
+
   ctx.font = 'bold 14px monospace';
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
-  ctx.fillText('PREVIEW', layout.previewX + layout.previewW / 2, layout.previewY + 28);
+  ctx.fillText('PREVIEW', previewCx, layout.previewY + 28);
 
   const previewSkin = shopTab === 0 ? selectedId : wallet.equipped.rocketSkin;
   const previewTrail = shopTab === 1 ? selectedId : wallet.equipped.trail;
   const previewAcc = shopTab === 2 ? selectedId : wallet.equipped.accessory;
   const bobAngle = Math.sin(time * 1.5) * 0.12;
   drawCosmeticRocketAt(
-    layout.previewX + layout.previewW / 2,
-    layout.previewY + 200,
+    previewCx,
+    rocketY,
     bobAngle,
-    3,
+    rocketScale,
     previewSkin,
     previewTrail,
     previewAcc,
@@ -1354,11 +1497,11 @@ function renderShop() {
 
   ctx.font = 'bold 13px monospace';
   ctx.fillStyle = '#ffd166';
-  ctx.fillText(selectedItem.label, layout.previewX + layout.previewW / 2, layout.previewY + 320);
+  ctx.fillText(selectedItem.label, previewCx, labelY);
   drawCenteredWrappedTextAt(
     selectedItem.desc,
-    layout.previewX + layout.previewW / 2,
-    layout.previewY + 342,
+    previewCx,
+    descY,
     layout.previewW - 40,
     '11px monospace',
     '#8fa3c8',
@@ -1404,7 +1547,7 @@ function renderShop() {
     isMobile
       ? 'TOQUE PARA SELECIONAR · TOQUE DE NOVO OU NO BOTÃO PARA COMPRAR/EQUIPAR · VOLTAR'
       : 'CLIQUE NOS ITENS · Q/E ABAS · ENTER AÇÃO · ESC VOLTAR · BACKSPACE TÍTULO',
-    688, 11, '#8892a6',
+    layout.hintY, 11, '#8892a6',
   ]]);
   drawToasts();
   drawVignette();
@@ -1707,7 +1850,8 @@ function launchSlingshot() {
 }
 
 function moonImpactWin() {
-  rocket.x = Math.max(W / 2 - 140, Math.min(W / 2 + 140, rocket.x));
+  const slingHalf = Math.min(140, W * 0.2);
+  rocket.x = Math.max(W / 2 - slingHalf, Math.min(W / 2 + slingHalf, rocket.x));
   rocket.y = moonSurfaceAt(rocket.x) + CONFIG.rocketHalfHeight;
   rocket.vx = 0;
   rocket.vy = 0;
@@ -2646,10 +2790,11 @@ function drawSlingshotUI() {
     }
   }
   ctx.globalAlpha = 1;
+  const pad = uiPad();
   drawCenteredText([
-    [isMobile ? 'TOQUE E ARRASTE O FOGUETE PRA TRÁS E SOLTE' : 'ARRASTE O FOGUETE PRA TRÁS E SOLTE', 622, 12, '#cfe3ff'],
-    ['ACERTE A LUA!', 644, 14, '#ffd166', true],
-    [isMobile ? '(TOQUE E ARRASTE)' : '(OU MIRE COM SETAS + ESPAÇO)', 668, 10, '#8892a6'],
+    [isMobile ? 'TOQUE E ARRASTE O FOGUETE PRA TRÁS E SOLTE' : 'ARRASTE O FOGUETE PRA TRÁS E SOLTE', H - pad.safeBottom - 98, 12, '#cfe3ff'],
+    ['ACERTE A LUA!', H - pad.safeBottom - 76, 14, '#ffd166', true],
+    [isMobile ? '(TOQUE E ARRASTE)' : '(OU MIRE COM SETAS + ESPAÇO)', H - pad.safeBottom - 52, 10, '#8892a6'],
   ]);
 }
 
@@ -2673,28 +2818,40 @@ function speedColor(value, limit) {
 }
 
 function drawHUD() {
+  const pad = uiPad();
   const activeStats = getActiveStats();
   const hudHeight = activeStats.extendedHud ? 82 : 62;
-  const hudPanelW = 360;
+  const hudTop = 8 + pad.safeTop;
+  const hudPanelW = Math.min(360, Math.round(W * 0.48));
+  const hudRightW = Math.min(220, Math.round(W * 0.32));
+  const leftX = 8;
+  const rightX = W - 8 - hudRightW;
   ctx.fillStyle = 'rgba(8,12,26,0.62)';
-  roundRect(8, 8, hudPanelW, hudHeight, 8);
+  roundRect(leftX, hudTop, hudPanelW, hudHeight, 8);
   ctx.fill();
   ctx.strokeStyle = 'rgba(120,160,255,0.18)';
   ctx.lineWidth = 1;
   ctx.stroke();
 
   ctx.fillStyle = 'rgba(8,12,26,0.62)';
-  roundRect(W - 8 - 220, 8, 220, hudHeight, 8);
+  roundRect(rightX, hudTop, hudRightW, hudHeight, 8);
   ctx.fill();
   ctx.strokeStyle = 'rgba(120,160,255,0.18)';
   ctx.stroke();
 
+  const textL = leftX + 12;
+  const barW = Math.min(150, hudPanelW - 40);
+  const line1 = hudTop + 18;
+  const line2 = hudTop + 24;
+  const line3 = hudTop + 50;
+  const line4 = hudTop + 66;
+
   ctx.textAlign = 'left';
   ctx.font = 'bold 10px monospace';
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('COMB.', 20, 26);
+  ctx.fillText('COMB.', textL, line1);
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  roundRect(20, 32, 150, 8, 4);
+  roundRect(textL, line2, barW, 8, 4);
   ctx.fill();
   const ratio = rocket.fuel / activeStats.fuelMax;
   const low = rocket.fuel <= 20;
@@ -2703,12 +2860,12 @@ function drawHUD() {
     ctx.shadowColor = barColor;
     ctx.shadowBlur = 6;
     ctx.fillStyle = barColor;
-    roundRect(20, 32, Math.max(6, 150 * ratio), 8, 4);
+    roundRect(textL, line2, Math.max(6, barW * ratio), 8, 4);
     ctx.fill();
     ctx.shadowBlur = 0;
   }
 
-  drawCoinBalanceInline(20, 32, 150, 8);
+  drawCoinBalanceInline(textL, line2, barW, 8);
 
   // target distance + velocity
   const target = platforms[targetIndex];
@@ -2719,16 +2876,18 @@ function drawHUD() {
   const label = slingScene ? 'LUA ' : (target.isPlanet ? 'PLANETA ' : 'PRÓX. LIMÃO ');
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = '#cfe3ff';
-  ctx.fillText(label + distance + 'm', 20, 58);
+  ctx.fillText(label + distance + 'm', textL, line3);
+  const midCol = textL + Math.min(140, hudPanelW * 0.4);
+  const midCol2 = textL + Math.min(225, hudPanelW * 0.62);
   if (state === 'slingshot') {
     ctx.fillStyle = '#ffd166';
-    ctx.fillText('ÂNGULO ' + Math.round(slingAngle * 180 / Math.PI), 160, 58);
-    ctx.fillText('POTÊNCIA ' + Math.round(slingPower * 100) + '%', 245, 58);
+    ctx.fillText('ÂNGULO ' + Math.round(slingAngle * 180 / Math.PI), midCol, line3);
+    ctx.fillText('POTÊNCIA ' + Math.round(slingPower * 100) + '%', midCol2, line3);
   } else {
     ctx.fillStyle = speedColor(rocket.vx, CONFIG.landingMaxVx);
-    ctx.fillText('VX ' + (Math.abs(rocket.vx) / 10).toFixed(1), 160, 58);
+    ctx.fillText('VX ' + (Math.abs(rocket.vx) / 10).toFixed(1), midCol, line3);
     ctx.fillStyle = speedColor(rocket.vy, CONFIG.landingMaxVy);
-    ctx.fillText('VY ' + (Math.abs(rocket.vy) / 10).toFixed(1), 225, 58);
+    ctx.fillText('VY ' + (Math.abs(rocket.vy) / 10).toFixed(1), midCol2, line3);
   }
 
   if (activeStats.extendedHud) {
@@ -2739,49 +2898,50 @@ function drawHUD() {
     const angOk = Math.abs(normalizeAngle(rocket.angle)) <= CONFIG.landingMaxAngle;
     ctx.font = 'bold 10px monospace';
     ctx.fillStyle = '#8fa3c8';
-    ctx.fillText('ÂNG ' + angleDeg + '\u00B0', 20, 74);
+    ctx.fillText('ÂNG ' + angleDeg + '\u00B0', textL, line4);
     ctx.fillStyle = speedColor(100 - fuelPct, 60);
-    ctx.fillText('COMB. ' + fuelPct + '%', 95, 74);
+    ctx.fillText('COMB. ' + fuelPct + '%', textL + 75, line4);
     ctx.fillStyle = vxOk ? '#57c74f' : '#ff5050';
-    ctx.fillText('VX' + (vxOk ? '\u2713' : '\u2717'), 175, 74);
+    ctx.fillText('VX' + (vxOk ? '\u2713' : '\u2717'), textL + 155, line4);
     ctx.fillStyle = vyOk ? '#57c74f' : '#ff5050';
-    ctx.fillText('VY' + (vyOk ? '\u2713' : '\u2717'), 215, 74);
+    ctx.fillText('VY' + (vyOk ? '\u2713' : '\u2717'), textL + 195, line4);
     ctx.fillStyle = angOk ? '#57c74f' : '#ff5050';
-    ctx.fillText('ÂNG' + (angOk ? '\u2713' : '\u2717'), 255, 74);
+    ctx.fillText('ÂNG' + (angOk ? '\u2713' : '\u2717'), textL + 235, line4);
   }
 
   // progress + attempts + pilot avatar
-  const hudRight = W - 88;
-  drawPixelAvatar(currentCharacter, W - 36, 14, 24, false);
+  const hudRight = rightX + hudRightW - 52;
+  drawPixelAvatar(currentCharacter, rightX + hudRightW - 28, hudTop + 6, 24, false);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#cfe3ff';
   const total = platforms.length - 1;
   const progressText = slingScene ? 'ALVO: LUA'
     : (target.isPlanet ? 'ALVO: PLANETA' : 'PLAT. ' + targetIndex + '/' + total);
-  ctx.fillText(progressText, hudRight, 26);
+  ctx.fillText(progressText, hudRight, hudTop + 18);
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('TENTATIVA ' + attempts, hudRight, 42);
-  ctx.fillText(CHARACTERS[currentCharacter].shortName, hudRight, 58);
+  ctx.fillText('TENTATIVA ' + attempts, hudRight, hudTop + 34);
+  ctx.fillText(CHARACTERS[currentCharacter].shortName, hudRight, hudTop + 50);
   if (activeStats.extendedHud) {
-    ctx.fillText(DIFFICULTIES[currentDiff].label, hudRight, 74);
+    ctx.fillText(DIFFICULTIES[currentDiff].label, hudRight, hudTop + 66);
   }
 
   // offscreen target arrow
   const targetScreenY = sy(target.y);
-  if (targetScreenY < 30 && state === 'playing') {
+  const arrowY = hudTop + hudHeight + 18;
+  if (targetScreenY < arrowY && state === 'playing') {
     const ax = Math.max(20, Math.min(W - 20, target.x + target.w / 2));
     ctx.shadowColor = '#ffd166';
     ctx.shadowBlur = 8;
     ctx.fillStyle = '#ffd166';
     ctx.beginPath();
-    ctx.moveTo(ax - 8, 92);
-    ctx.lineTo(ax + 8, 92);
-    ctx.lineTo(ax, 80);
+    ctx.moveTo(ax - 8, arrowY + 12);
+    ctx.lineTo(ax + 8, arrowY + 12);
+    ctx.lineTo(ax, arrowY);
     ctx.closePath();
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.textAlign = 'center';
-    ctx.fillText(distance + 'm', ax, 108);
+    ctx.fillText(distance + 'm', ax, arrowY + 28);
   }
   ctx.textAlign = 'left';
 
@@ -2792,16 +2952,17 @@ function drawHUD() {
     ctx.textAlign = 'center';
     ctx.fillText(
       isMobile ? 'INCLINE PARA GIRAR · SEGURE PARA EMPUXO' : '←/→ GIRAR · ↑ EMPUXO · ESC PAUSA · M SOM',
-      W / 2, H - 14
+      W / 2, H - pad.safeBottom - 14
     );
     ctx.textAlign = 'left';
   }
 }
 
 function drawToasts() {
+  const pad = uiPad();
   ctx.font = 'bold 14px monospace';
   ctx.textAlign = 'center';
-  let y = 180;
+  let y = pad.safeTop + (isPortraitMobile ? 120 : 180);
   for (const t of toasts) {
     ctx.globalAlpha = Math.min(1, t.t);
     ctx.fillStyle = '#ffd166';
@@ -2893,14 +3054,15 @@ function countWrappedLines(text, maxWidth, font, maxLines) {
 }
 
 function renderTitle() {
+  const layout = getTitleLayout();
   drawBackground(time * 12);
   drawCenteredText([
-    ['ROCKET', 160, 52, '#f4f6fb', true],
-    ['LEMON', 220, 52, '#8fd94a', true],
-    ['DECOLE ATÉ A LUA', 258, 14, '#cfe3ff'],
+    ['ROCKET', layout.titleY1, 52, '#f4f6fb', true],
+    ['LEMON', layout.titleY2, 52, '#8fd94a', true],
+    ['DECOLE ATÉ A LUA', layout.subtitleY, 14, '#cfe3ff'],
   ]);
   ctx.save();
-  ctx.translate(W / 2, 400);
+  ctx.translate(W / 2, layout.rocketY);
   const titleSkin = wallet?.equipped?.rocketSkin || 'default';
   const titleTrail = wallet?.equipped?.trail || 'default';
   const titleAcc = wallet?.equipped?.accessory || 'none';
@@ -2913,16 +3075,16 @@ function renderTitle() {
   ctx.drawImage(flame, -15, 46, 30, 24);
   ctx.restore();
   if (Math.floor(time * 2) % 2 === 0) {
-    drawCenteredText([[isMobile ? 'TOQUE PARA COMEÇAR' : 'CLIQUE OU ENTER PARA COMEÇAR', 560, 16, '#ffffff', true]]);
+    drawCenteredText([[isMobile ? 'TOQUE PARA COMEÇAR' : 'CLIQUE OU ENTER PARA COMEÇAR', layout.ctaY, 16, '#ffffff', true]]);
   }
   drawCenteredText([
-    [isMobile ? 'INCLINE O CELULAR - SEGURE PARA EMPUXO' : '←/→ GIRAR - ↑ EMPUXO - ESC PAUSA - M SOM', 640, 11, '#8892a6'],
-    ['PEGUE CADA LIMÃO. POUSE SUAVEMENTE NA LUA.', 662, 11, '#8892a6'],
+    [isMobile ? 'INCLINE O CELULAR - SEGURE PARA EMPUXO' : '←/→ GIRAR - ↑ EMPUXO - ESC PAUSA - M SOM', layout.hint1Y, 11, '#8892a6'],
+    ['PEGUE CADA LIMÃO. POUSE SUAVEMENTE NA LUA.', layout.hint2Y, 11, '#8892a6'],
   ]);
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = '#8fa3c8';
   ctx.textAlign = 'left';
-  ctx.fillText('MOEDAS: ' + wallet.coins, 20, H - 24);
+  ctx.fillText('MOEDAS: ' + wallet.coins, 20, layout.coinsY);
   const shopBtn = getTitleShopButtonRect();
   ctx.fillStyle = 'rgba(255,209,102,0.15)';
   roundRect(shopBtn.x, shopBtn.y, shopBtn.w, shopBtn.h, 6);
@@ -2946,15 +3108,17 @@ const CHAR_MENU_GRID_NAV = {
 };
 
 function getCharacterMenuLayout() {
-  const margin = 48;
-  const gap = 24;
+  const pad = uiPad();
+  const margin = isPortraitMobile ? pad.margin : 48;
+  const gap = isPortraitMobile ? 16 : 24;
   const cols = 2;
   const rows = 2;
   const cardW = (W - margin * 2 - gap) / cols;
   const originX = margin;
-  const originY = 165;
-  const hintY = 680;
+  const originY = isPortraitMobile ? pad.topBar + 40 : 165;
+  const hintY = isPortraitMobile ? pad.hintY : 680;
   const cardH = Math.floor((hintY - 20 - originY - gap) / rows);
+  const avatarSize = Math.min(120, Math.max(64, Math.min(cardH - 32, Math.floor(cardW * 0.38))));
   function cardRect(i) {
     const col = i % cols;
     const row = Math.floor(i / cols);
@@ -2965,7 +3129,7 @@ function getCharacterMenuLayout() {
       h: cardH,
     };
   }
-  return { margin, gap, cols, rows, cardW, cardH, originX, originY, avatarSize: 120, padding: 16, cardRect };
+  return { margin, gap, cols, rows, cardW, cardH, originX, originY, avatarSize, padding: 16, cardRect, hintY };
 }
 
 function drawRoleBadge(role, x, y, selected) {
@@ -3046,36 +3210,40 @@ function drawCharacterCard(key, rect, selected) {
 
 function renderCharacterMenu() {
   const layout = getCharacterMenuLayout();
+  const back = getCharacterBackRect();
+  const shop = getCharacterShopRect();
 
   drawBackground(time * 12);
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = '#8892a6';
   ctx.textAlign = 'left';
-  ctx.fillText('← TÍTULO', 48, 100);
-  drawCenteredText([['ESCOLHA O PILOTO', 115, 28, '#ffd166', true]]);
+  ctx.fillText('← TÍTULO', back.x, back.y + 12);
+  drawCenteredText([['ESCOLHA O PILOTO', layout.originY - 30, 28, '#ffd166', true]]);
   CHAR_KEYS.forEach((key, i) => drawCharacterCard(key, layout.cardRect(i), i === menuIndex));
   drawCenteredText([[
     isMobile ? 'TOQUE NO PILOTO · TOQUE LOJA NO CANTO' : 'CLIQUE NO PILOTO · ↑/↓/←/→ SELECIONAR · ENTER CONTINUAR · L LOJA · ESC VOLTAR',
-    680, 11, '#8892a6',
+    layout.hintY, 11, '#8892a6',
   ]]);
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = '#ffd166';
   ctx.textAlign = 'right';
-  ctx.fillText('LOJA (L)', W - 48, 100);
+  ctx.fillText('LOJA (L)', shop.x + shop.w, shop.y + 12);
   ctx.textAlign = 'left';
   drawVignette();
 }
 
 function renderMenu() {
+  const layout = getDifficultyLayout();
   drawBackground(time * 12);
-  drawCenteredText([['ESCOLHA A DIFICULDADE', 150, 24, '#ffd166', true]]);
+  drawCenteredText([['ESCOLHA A DIFICULDADE', layout.titleY, 24, '#ffd166', true]]);
   DIFF_KEYS.forEach((key, i) => {
     const diff = DIFFICULTIES[key];
-    const y = 260 + i * 90;
+    const y = layout.rowY(i);
+    const hit = layout.hitRect(i);
     const selected = i === menuIndex;
     if (selected) {
       ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      roundRect(90, y - 26, W - 180, 66, 10);
+      roundRect(hit.x, hit.y, hit.w, hit.h, 10);
       ctx.fill();
       ctx.strokeStyle = 'rgba(255,209,102,0.4)';
       ctx.lineWidth = 1;
@@ -3086,7 +3254,7 @@ function renderMenu() {
       [diff.desc, y + 24, 11, selected ? '#cfe3ff' : '#5a6478'],
     ]);
   });
-  drawCenteredText([[isMobile ? 'TOQUE PARA DECOLAR' : 'CLIQUE OU ↑/↓ SELECIONAR · ENTER DECOLAR · ESC VOLTAR', 620, 11, '#8892a6']]);
+  drawCenteredText([[isMobile ? 'TOQUE PARA DECOLAR' : 'CLIQUE OU ↑/↓ SELECIONAR · ENTER DECOLAR · ESC VOLTAR', layout.hintY, 11, '#8892a6']]);
   drawVignette();
 }
 
@@ -3106,8 +3274,8 @@ function renderWorld() {
   if (state === 'slingshot' && slingBanner > 0) {
     ctx.globalAlpha = Math.min(1, slingBanner);
     drawCenteredText([
-      ['MODO ESTILINGUE!', 300, 32, '#ffd166', true],
-      ['NOVA MECÂNICA: PUXE E ACERTE A LUA', 336, 12, '#ffffff'],
+      ['MODO ESTILINGUE!', Math.round(H * 0.35), 32, '#ffd166', true],
+      ['NOVA MECÂNICA: PUXE E ACERTE A LUA', Math.round(H * 0.38), 12, '#ffffff'],
     ]);
     ctx.globalAlpha = 1;
   }
@@ -3121,35 +3289,43 @@ function renderWorld() {
   drawToasts();
 
   if (state === 'win' && winTime > 3.2) {
+    const panelH = 216;
+    const panelY = Math.round(H / 2 - panelH / 2 - 40);
+    const panelX = Math.max(24, Math.round(W * 0.05));
+    const panelW = W - panelX * 2;
     ctx.fillStyle = 'rgba(10,14,30,0.82)';
-    roundRect(60, 96, W - 120, 216, 12);
+    roundRect(panelX, panelY, panelW, panelH, 12);
     ctx.fill();
     ctx.strokeStyle = 'rgba(255,209,102,0.35)';
     ctx.lineWidth = 1;
     ctx.stroke();
     drawCenteredText([
-      ['VOCÊ CHEGOU', 148, 30, '#ffd166', true],
-      ['NA LUA!', 186, 30, '#ffd166', true],
-      ['TENTATIVAS: ' + attempts, 228, 14, '#cfe3ff'],
-      ['MOEDAS: ' + wallet.coins, 252, 14, '#ffd166'],
-      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'CLIQUE: REPETIR · METADE DE BAIXO: MENU · R / ENTER', 284, 13, '#ffffff'],
+      ['VOCÊ CHEGOU', panelY + 52, 30, '#ffd166', true],
+      ['NA LUA!', panelY + 90, 30, '#ffd166', true],
+      ['TENTATIVAS: ' + attempts, panelY + 132, 14, '#cfe3ff'],
+      ['MOEDAS: ' + wallet.coins, panelY + 156, 14, '#ffd166'],
+      [isMobile ? 'TOQUE PARA REPETIR - METADE DE BAIXO: MENU' : 'CLIQUE: REPETIR · METADE DE BAIXO: MENU · R / ENTER', panelY + 188, 13, '#ffffff'],
     ]);
   } else if (state === 'lose') {
+    const panelH = 290;
+    const panelY = Math.round(H / 2 - panelH / 2);
+    const panelX = Math.max(24, Math.round(W * 0.05));
+    const panelW = W - panelX * 2;
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = 'rgba(10,14,30,0.85)';
-    roundRect(60, 240, W - 120, 290, 12);
+    roundRect(panelX, panelY, panelW, panelH, 12);
     ctx.fill();
     ctx.strokeStyle = 'rgba(120,160,255,0.25)';
     ctx.lineWidth = 1;
     ctx.stroke();
     drawCenteredText([
-      ['EXPLODIU!', 280, 36, '#ff4d5e', true],
+      ['EXPLODIU!', panelY + 40, 36, '#ff4d5e', true],
     ]);
-    const quoteY = 320;
+    const quoteY = panelY + 80;
     const quoteFont = 'bold 12px monospace';
     const quoteLines = drawCenteredWrappedText(
-      deathQuote, quoteY, 320, quoteFont, '#cfe3ff', 15
+      deathQuote, quoteY, Math.min(320, panelW - 40), quoteFont, '#cfe3ff', 15
     );
     const reasonY = quoteY + quoteLines * 15 + 12;
     drawCenteredText([
@@ -3350,11 +3526,13 @@ function handleMenuTap(x, y) {
     state = 'character';
     menuIndex = 0;
   } else if (state === 'character') {
-    if (x >= 48 && x <= 140 && y >= 88 && y <= 108) {
+    const back = getCharacterBackRect();
+    if (x >= back.x && x <= back.x + back.w && y >= back.y && y <= back.y + back.h) {
       state = 'title';
       return;
     }
-    if (x >= W - 160 && x <= W - 48 && y >= 88 && y <= 108) {
+    const shop = getCharacterShopRect();
+    if (x >= shop.x && x <= shop.x + shop.w && y >= shop.y && y <= shop.y + shop.h) {
       openShop('character');
       return;
     }
@@ -3371,9 +3549,10 @@ function handleMenuTap(x, y) {
   } else if (state === 'shop') {
     handleShopTap(x, y);
   } else if (state === 'difficulty') {
+    const layout = getDifficultyLayout();
     for (let i = 0; i < DIFF_KEYS.length; i++) {
-      const cy = 260 + i * 90;
-      if (x >= 90 && x <= W - 90 && y >= cy - 26 && y <= cy + 40) {
+      const hit = layout.hitRect(i);
+      if (x >= hit.x && x <= hit.x + hit.w && y >= hit.y && y <= hit.y + hit.h) {
         startGame(DIFF_KEYS[i], false);
         return;
       }
@@ -3499,7 +3678,8 @@ loadAvatars();
 // debug/test hooks
 window.__rl = {
   CONFIG, DIFFICULTIES, startGame, update, render, keys, audio,
-  isMobile, enableTilt,
+  isMobile, isPortraitMobile, get W() { return W; }, get H() { return H; },
+  enableTilt,
   get tiltEnabled() { return tiltEnabled; },
   get tiltInput() { return tiltInput; },
   get neutralGamma() { return neutralGamma; },
